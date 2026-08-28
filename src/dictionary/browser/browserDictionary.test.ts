@@ -40,6 +40,14 @@ test("browser manifest preserves source metadata and total entry count", () => {
   assert.equal(manifest.firstCharShards["み"]?.entries, 1);
 });
 
+test("keeps JMnedict source and proper noun type in browser shards", () => {
+  const properNoun = createWordEntry({ id: "name-1", source: "JMnedict", reading: "とうきょう", surface: "東京", properNounType: "PLACE", semanticTags: ["place"] });
+  const groups = groupEntriesBy([...entries, properNoun], (entry) => entry.firstChar);
+  const shardEntry = groups.get("と")?.find((entry) => entry.id === "name-1");
+  assert.equal(shardEntry?.source, "JMnedict");
+  assert.equal(shardEntry?.properNounType, "PLACE");
+});
+
 test("loads みらい from the み first-character shard", async () => {
   const { loader } = loaderFixture(); await loader.ensureFirstChar("み");
   assert.equal(loader.repository.findByReading("みらい")[0]?.surface, "未来");

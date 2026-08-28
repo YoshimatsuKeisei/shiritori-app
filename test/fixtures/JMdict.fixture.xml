@@ -24,4 +24,6 @@
   <entry><ent_seq>1008</ent_seq><r_ele><reb>いしのうえにもさんねん</reb></r_ele><sense><pos>&exp;</pos><misc>&proverb;</misc></sense></entry>
   <entry><ent_seq>1009</ent_seq><k_ele><keb>食べる</keb></k_ele><r_ele><reb>たべる</reb></r_ele><sense><pos>&v1;</pos></sense></entry>
   <entry><ent_seq>1010</ent_seq><k_ele><keb>林檎</keb></k_ele><k_ele><keb>林檎</keb></k_ele><r_ele><reb>りんご</reb></r_ele><sense><pos>&n;</pos></sense></entry>
+  <entry><ent_seq>1011</ent_seq><k_ele><keb>会社</keb></k_ele><r_ele><reb>かいしゃ</reb></r_ele><sense><pos>&n;</pos></sense></entry>
+  <entry><ent_seq>1012</ent_seq><k_ele><keb>電車</keb></k_ele><r_ele><reb>でんしゃ</reb></r_ele><sense><pos>&n;</pos></sense></entry>
 </JMdict>

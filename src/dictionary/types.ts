@@ -60,6 +60,14 @@ export interface DictionaryMetadata {
   generatedAt: string;
   jmdictSource?: string;
   jmnedictSource?: string;
+  statistics?: DictionaryStatistics;
+}
+
+export interface DictionaryStatistics {
+  totalEntries: number;
+  bySource: Record<DictionarySource, number>;
+  jmdict: { commonNouns: number; proverbs: number };
+  jmnedict: Record<ProperNounType, number>;
 }
 
 export interface GeneratedDictionary {

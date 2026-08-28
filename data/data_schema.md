@@ -93,6 +93,12 @@ interface DictionaryMetadata {
   generatedAt: string;
   jmdictSource?: string;
   jmnedictSource?: string;
+  statistics?: {
+    totalEntries: number;
+    bySource: Record<"JMdict" | "JMnedict", number>;
+    jmdict: { commonNouns: number; proverbs: number };
+    jmnedict: Record<ProperNounType, number>;
+  };
 }
 
 interface GeneratedDictionary {

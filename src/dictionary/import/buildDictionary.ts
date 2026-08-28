@@ -1,6 +1,7 @@
 import { basename } from "node:path";
+import { access } from "node:fs/promises";
 
-import type { GeneratedDictionary, WordEntry } from "../types.js";
+import type { DictionaryStatistics, GeneratedDictionary, ProperNounType, WordEntry } from "../types.js";
 import { parseJmdictEntry } from "./jmdict.js";
 import { parseJmnedictEntry } from "./jmnedict.js";
 import { openDictionaryXml, streamXmlEntries } from "./xmlEntries.js";
@@ -33,6 +34,32 @@ export function deduplicateWordEntries(
     seen.add(key);
     return true;
   });
+}
+
+export function calculateDictionaryStatistics(entries: readonly WordEntry[]): DictionaryStatistics {
+  const properNounCounts: Record<ProperNounType, number> = {
+    PERSON: 0, PLACE: 0, ORGANIZATION: 0, WORK: 0, PRODUCT: 0, OTHER: 0,
+  };
+  let jmdict = 0;
+  let jmnedict = 0;
+  let commonNouns = 0;
+  let proverbs = 0;
+  for (const entry of entries) {
+    if (entry.source === "JMdict") {
+      jmdict += 1;
+      if (entry.semanticTags.includes("proverb")) proverbs += 1;
+      else commonNouns += 1;
+    } else {
+      jmnedict += 1;
+      properNounCounts[entry.properNounType ?? "OTHER"] += 1;
+    }
+  }
+  return {
+    totalEntries: entries.length,
+    bySource: { JMdict: jmdict, JMnedict: jmnedict },
+    jmdict: { commonNouns, proverbs },
+    jmnedict: properNounCounts,
+  };
 }
 
 async function importFile(
@@ -77,6 +104,7 @@ export async function buildDictionary(
   const entries: WordEntry[] = [];
 
   if (options.jmdictPath) {
+    await access(options.jmdictPath).catch(() => { throw new Error(`JMdict input file not found: ${options.jmdictPath}`); });
     const jmdictEntries = await importFile(
       options.jmdictPath,
       parseJmdictEntry,
@@ -86,6 +114,7 @@ export async function buildDictionary(
   }
 
   if (options.jmnedictPath) {
+    await access(options.jmnedictPath).catch(() => { throw new Error(`JMnedict input file not found: ${options.jmnedictPath}`); });
     const jmnedictEntries = await importFile(
       options.jmnedictPath,
       parseJmnedictEntry,
@@ -94,6 +123,7 @@ export async function buildDictionary(
     appendEntries(entries, jmnedictEntries);
   }
 
+  const deduplicatedEntries = deduplicateWordEntries(entries);
   return {
     metadata: {
       schemaVersion: DICTIONARY_SCHEMA_VERSION,
@@ -104,8 +134,8 @@ export async function buildDictionary(
       ...(options.jmnedictPath
         ? { jmnedictSource: basename(options.jmnedictPath) }
         : {}),
+      statistics: calculateDictionaryStatistics(deduplicatedEntries),
     },
-
-    entries: deduplicateWordEntries(entries),
+    entries: deduplicatedEntries,
   };
 }

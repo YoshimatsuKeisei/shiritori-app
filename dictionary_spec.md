@@ -453,3 +453,13 @@ Stage 8.2では`deriveNextConnection`が返す正規サイズの接続かなを�
 再生成可能な`public/dictionary/`はGit管理外を維持する。`dictionary:blob:upload -- --prefix <version>`は配下だけを再帰列挙し、Windows pathをBlob用`/`へ変換する。最大4並列でshardを先にuploadし、全成功後にmanifestを最後に公開する。pathnameはversion prefixと相対pathの決定的な組で、random suffix・overwriteを許可しない。
 
 upload用`BLOB_READ_WRITE_TOKEN`はNode CLIだけが`process.env`から読み、ブラウザコードや`VITE_`変数へ渡さない。upload後はmanifestのSDK返却URLからBase URLを導出するため、Blob hostをコードへ固定しない。
+
+## 24. Stage 8.4 JMnedict本番統合とcoverage監査
+
+本番生成はJMdictとJMnedictの両パスを`dictionary:build`へ渡す。JMdictの採用範囲は`n`, `n-adv`, `n-pr`, `n-pref`, `n-suf`, `n-t`, `num`, `pn`と`proverb`のまま維持する。JMnedictはPERSON、PLACE、ORGANIZATION、WORK、PRODUCT、OTHERへ分類し、未知の`name_type`はbuildを停止せずOTHERとする。日本語として正規化できない読み・表記は`createWordEntry`前に除外するが、日本語を含む混在表記は保持する。
+
+`DictionaryMetadata.statistics`は後方互換のためoptionalとし、総数、source別、JMdictの一般名詞/ことわざ、JMnedictの分類別件数を保持する。ブラウザmanifestはmetadataをそのまま保持し、shard内の`source`と`properNounType`も削除しない。
+
+`dictionary:audit`は生成JSON全体をscopeで絞らず監査し、正規化読みごとにsource、reading、surface、properNounType、partOfSpeech、semanticTagsを表示する。通常プレイのscopeは全項目有効とし、JMdict/JMnedictを同じRepositoryで検索する。有名度、姓・名の形式、地名規模による追加フィルタは行わない。重複キーはsourceを含む従来仕様を維持し、通常モードの使用済みキーは読み、漢字モードは表記とする。
+
+辞書更新は既存Blob版を上書きせず`dictionaries/full-v1`のような新規prefixへ公開し、Vercel環境変数を切り替える。旧版は実機確認が終わるまでrollback用に保持する。

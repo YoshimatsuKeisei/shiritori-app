@@ -1,4 +1,5 @@
 import { createWordEntry } from "../createWordEntry.js";
+import { normalizeReading, normalizeShiritoriText } from "../japaneseText.js";
 import type { ProperNounType, WordEntry } from "../types.js";
 import { extractBlocks, extractEntityCode, extractTagValues } from "./xmlEntries.js";
 
@@ -24,12 +25,13 @@ export function parseJmnedictEntry(xml: string): WordEntry[] {
 
   for (const [readingIndex, block] of extractBlocks(xml, "r_ele").entries()) {
     const reading = extractTagValues(block, "reb")[0];
-    if (!reading) continue;
+    if (!reading || !normalizeReading(reading)) continue;
     const restrictions = new Set(extractTagValues(block, "re_restr"));
     const applicableSurfaces = surfaces.length === 0
       ? [reading]
       : surfaces.filter((surface) => restrictions.size === 0 || restrictions.has(surface));
     for (const [surfaceIndex, surface] of applicableSurfaces.entries()) {
+      if (!normalizeShiritoriText(surface)) continue;
       entries.push(createWordEntry({
         id: `JMnedict:${sequence}:${readingIndex}:${surfaceIndex}`,
         source: "JMnedict",

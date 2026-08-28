@@ -43,12 +43,15 @@ async function main(): Promise<void> {
   await mkdir(output, { recursive: true });
   await writeGroups(output, first, manifest.firstCharShards);
   await writeGroups(output, last, manifest.lastCharShards);
-  await writeFile(resolve(output, "manifest.json"), JSON.stringify(manifest, null, 2));
+  const serializedManifest = JSON.stringify(manifest, null, 2);
+  await writeFile(resolve(output, "manifest.json"), serializedManifest);
   const firstBytes = Object.values(manifest.firstCharShards).reduce((sum, shard) => sum + shard.bytes, 0);
   const lastBytes = Object.values(manifest.lastCharShards).reduce((sum, shard) => sum + shard.bytes, 0);
   const all = [...Object.entries(manifest.firstCharShards).map(([character, shard]) => ({ direction: "first", character, ...shard })), ...Object.entries(manifest.lastCharShards).map(([character, shard]) => ({ direction: "last", character, ...shard }))];
-  const largest = all.sort((left, right) => right.bytes - left.bytes)[0];
-  console.log(JSON.stringify({ totalEntries: manifest.totalEntries, firstShards: first.size, lastShards: last.size, firstBytes, lastBytes, totalBytes: firstBytes + lastBytes, averageBytes: Math.round((firstBytes + lastBytes) / all.length), largest }, null, 2));
+  const largestFirstShard = [...Object.entries(manifest.firstCharShards)].map(([character, shard]) => ({ direction: "first", character, ...shard })).sort((left, right) => right.bytes - left.bytes)[0];
+  const largestLastShard = [...Object.entries(manifest.lastCharShards)].map(([character, shard]) => ({ direction: "last", character, ...shard })).sort((left, right) => right.bytes - left.bytes)[0];
+  const manifestBytes = Buffer.byteLength(serializedManifest);
+  console.log(JSON.stringify({ totalEntries: manifest.totalEntries, totalFiles: all.length + 1, firstShards: first.size, lastShards: last.size, firstBytes, lastBytes, manifestBytes, totalBytes: firstBytes + lastBytes + manifestBytes, averageShardBytes: all.length === 0 ? 0 : Math.round((firstBytes + lastBytes) / all.length), largestFirstShard, largestLastShard }, null, 2));
 }
 
 await main();

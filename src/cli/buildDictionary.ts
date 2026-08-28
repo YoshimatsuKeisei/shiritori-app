@@ -32,7 +32,26 @@ async function main(): Promise<void> {
   const dictionary = await buildDictionary(options);
   await mkdir(dirname(options.outputPath), { recursive: true });
   await writeFile(options.outputPath, `${JSON.stringify(dictionary)}\n`, "utf8");
-  process.stdout.write(`Generated ${dictionary.entries.length} entries: ${options.outputPath}\n`);
+  const statistics = dictionary.metadata.statistics!;
+  process.stdout.write([
+    "Dictionary build complete",
+    "",
+    `Total entries: ${statistics.totalEntries}`,
+    "",
+    "By source:",
+    `  JMdict: ${statistics.bySource.JMdict}`,
+    `  JMnedict: ${statistics.bySource.JMnedict}`,
+    "",
+    "JMdict:",
+    `  common nouns: ${statistics.jmdict.commonNouns}`,
+    `  proverbs: ${statistics.jmdict.proverbs}`,
+    "",
+    "JMnedict:",
+    ...Object.entries(statistics.jmnedict).map(([type, count]) => `  ${type}: ${count}`),
+    "",
+    `Output: ${options.outputPath}`,
+    "",
+  ].join("\n"));
 }
 
 main().catch((error: unknown) => {

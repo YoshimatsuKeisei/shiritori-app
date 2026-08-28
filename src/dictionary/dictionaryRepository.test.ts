@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { resolveWordEntry } from "./createWordEntry.js";
 import { buildDictionary, deduplicateWordEntries } from "./import/buildDictionary.js";
 import { parseJmdictEntry } from "./import/jmdict.js";
-import { parseJmnedictEntry } from "./import/jmnedict.js";
+import { mapJmnedictNameType, parseJmnedictEntry } from "./import/jmnedict.js";
 import { InMemoryDictionaryRepository } from "./repository.js";
 import type { DictionaryScope } from "./types.js";
 import { evaluateAnswer } from "../rules/evaluate.js";
@@ -42,12 +42,36 @@ test("imports and classifies JMnedict name types", () => {
   assert.equal(repository.findByReading("たなか")[0]?.properNounType, "PERSON");
   assert.equal(repository.findByReading("とうきょう")[0]?.properNounType, "PLACE");
   assert.equal(repository.findByReading("じしょきょうかい")[0]?.properNounType, "ORGANIZATION");
+  assert.equal(repository.findByReading("じしょものがたり")[0]?.properNounType, "WORK");
+  assert.equal(repository.findByReading("じしょぺん")[0]?.properNounType, "PRODUCT");
+  assert.equal(repository.findByReading("じしょのもり")[0]?.properNounType, "OTHER");
+  assert.equal(repository.findByReading("えーびーしー").length, 0);
+  assert.equal(repository.findByReading("にほんえーびーしー")[0]?.surface, "日本ABC");
+  assert.equal(repository.findByReading("ABC123").length, 0);
+});
+
+test("maps official JMnedict name types and safely falls back to OTHER", () => {
+  for (const tag of ["surname", "given", "fem", "masc", "person", "unclass"]) assert.equal(mapJmnedictNameType([tag]), "PERSON");
+  for (const tag of ["place", "station"]) assert.equal(mapJmnedictNameType([tag]), "PLACE");
+  for (const tag of ["organization", "company"]) assert.equal(mapJmnedictNameType([tag]), "ORGANIZATION");
+  assert.equal(mapJmnedictNameType(["work"]), "WORK");
+  assert.equal(mapJmnedictNameType(["product"]), "PRODUCT");
+  assert.equal(mapJmnedictNameType(["future-tag"]), "OTHER");
 });
 
 test("returns all homophones and specialized reading candidates", () => {
   assert.deepEqual(repository.findByReading("はし").map((entry) => entry.surface), ["橋", "箸", "端"]);
   assert.deepEqual(repository.findKanjiCandidatesByReading("こうしょう").map((entry) => entry.surface), ["交渉", "校章", "鉱床"]);
   assert.deepEqual(repository.findKatakanaCandidatesByReading("すーぱー").map((entry) => entry.surface), ["スーパー"]);
+});
+
+test("returns JMdict and JMnedict records sharing one reading without merging sources", () => {
+  const mixed = new InMemoryDictionaryRepository([
+    ...parseJmdictEntry("<entry><ent_seq>20</ent_seq><k_ele><keb>東京</keb></k_ele><r_ele><reb>とうきょう</reb></r_ele><sense><pos>&n-pr;</pos></sense></entry>"),
+    ...parseJmnedictEntry("<entry><ent_seq>21</ent_seq><k_ele><keb>東京</keb></k_ele><r_ele><reb>とうきょう</reb></r_ele><trans><name_type>&place;</name_type></trans></entry>"),
+  ]);
+  assert.deepEqual(mixed.findByReading("とうきょう").map((entry) => entry.source), ["JMdict", "JMnedict"]);
+  assert.deepEqual(mixed.findByReading("とうきょう", { ...allScope, properNouns: false }).map((entry) => entry.source), ["JMdict"]);
 });
 
 test("searches indexed connection, length, and script conditions", () => {
@@ -65,6 +89,17 @@ test("filters forbidden characters and dictionary scopes", () => {
   const placesOnly = { ...allScope, people: false, organizations: false, works: false, products: false };
   assert.equal(repository.findByReading("とうきょう", placesOnly).length, 1);
   assert.equal(repository.findByReading("たなか", placesOnly).length, 0);
+});
+
+test("applies every proper-noun scope switch including OTHER", () => {
+  const cases = [["たなか", "people"], ["とうきょう", "places"], ["じしょきょうかい", "organizations"], ["じしょものがたり", "works"], ["じしょぺん", "products"]] as const;
+  for (const [reading, key] of cases) {
+    assert.equal(repository.findByReading(reading, { ...allScope, [key]: false }).length, 0);
+    assert.equal(repository.findByReading(reading, allScope).length, 1);
+  }
+  assert.equal(repository.findByReading("じしょのもり", allScope).length, 1);
+  assert.equal(repository.findByReading("じしょのもり", { ...allScope, properNouns: false }).length, 0);
+  assert.equal(repository.searchWords({ scope: { ...allScope, properNouns: false } }).some((entry) => entry.source === "JMnedict"), false);
 });
 
 test("counts matching words without exposing storage details", () => {
@@ -110,10 +145,10 @@ test("connects dictionary search through ResolvedWord to the rule engine", () =>
 });
 
 test("stores deterministic source metadata", () => {
-  assert.deepEqual(generated.metadata, {
-    schemaVersion: 1,
-    generatedAt: "2026-01-01T00:00:00.000Z",
-    jmdictSource: "JMdict.fixture.xml",
-    jmnedictSource: "JMnedict.fixture.xml",
-  });
+  assert.equal(generated.metadata.jmdictSource, "JMdict.fixture.xml");
+  assert.equal(generated.metadata.jmnedictSource, "JMnedict.fixture.xml");
+  assert.equal(generated.metadata.statistics?.totalEntries, generated.entries.length);
+  assert.equal((generated.metadata.statistics?.bySource.JMdict ?? 0) > 0, true);
+  assert.equal(generated.metadata.statistics?.bySource.JMnedict, 9);
+  assert.deepEqual(generated.metadata.statistics?.jmnedict, { PERSON: 2, PLACE: 2, ORGANIZATION: 2, WORK: 1, PRODUCT: 1, OTHER: 1 });
 });

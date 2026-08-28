@@ -27,10 +27,19 @@
 EDRDGから適切に取得したJMdict/JMnedictのXMLまたはXML.GZをローカル入力として指定する。
 
 ```bash
-npm run dictionary:build -- --jmdict data/raw/JMdict.xml.gz --jmnedict data/raw/JMnedict.xml.gz
+npm.cmd run dictionary:build -- --jmdict data/raw/JMdict_e.gz --jmnedict data/raw/JMnedict.xml.gz
 ```
 
-既定出力は`data/generated/dictionary.json`。原典と本番生成物はGit管理外で、出典・利用条件は`NOTICE.md`を参照する。
+既定出力は`data/generated/dictionary.json`。`--jmdict`だけの生成も可能だが、本番ではJMdict＋JMnedictを指定する。ファイル名は固定せず、実際に取得したXML/XML.GZのパスを渡す。原典と本番生成物はGit管理外で、出典・利用条件は`NOTICE.md`を参照する。
+
+生成後、読みのcoverageと採用されたsource・表記・分類・POSを監査できる。複数の`--reading`を指定しても辞書JSONは1回だけロードする。1語でも見つからない場合は全件表示後に終了コード1となる。
+
+```powershell
+npm.cmd run dictionary:audit -- --reading とうきょう --reading おおさか --reading やまだ
+npm.cmd run dictionary:audit -- --dictionary data/generated/dictionary.json --reading かいしゃ
+```
+
+`NOT FOUND`はPOSを即座に拡張する根拠ではない。原典収録状況、POS、表記・読みvalidationを切り分けてから採用基準を見直す。
 
 ## 1人デバッグGameState
 
@@ -109,7 +118,7 @@ GAME OVER後は簡易リザルト、同設定での再戦、設定へ戻る操�
 - TWO_CHARACTERの先読みshardを末尾2文字条件の先頭文字へ修正
 - 漢字・部首継承制約を2語目以降だけ適用
 - manifest取得失敗後の再試行を可能化
-- 公開設定画面へJMdict / EDRDGクレジットを表示
+- 公開設定画面へJMdict / JMnedict / EDRDGクレジットを表示
 
 辞書のPOS・固有名詞採用範囲は今回変更していない。実際のRejectReasonと対象語を収集してから調整する。
 
@@ -186,12 +195,13 @@ git push
 原典を更新した場合だけ、辞書生成、browser shard生成、新しいversion prefixへのuploadを行う。
 
 ```powershell
-npm.cmd run dictionary:build -- --jmdict data/raw/JMdict_e.gz
+npm.cmd run dictionary:build -- --jmdict data/raw/JMdict_e.gz --jmnedict data/raw/JMnedict.xml.gz
+npm.cmd run dictionary:audit -- --reading とうきょう --reading おおさか --reading やまだ
 npm.cmd run dictionary:browser
-npm.cmd run dictionary:blob:upload -- --prefix shiritori-dictionary-v2
+npm.cmd run dictionary:blob:upload -- --prefix dictionaries/full-v1
 ```
 
-Vercelの`VITE_DICTIONARY_BASE_URL`をv2へ変更して再deployする。正常動作を確認するまでv1を削除せず、rollback可能な状態を維持する。
+CLIが出力した`dictionaries/full-v1`のBase URLへVercelの`VITE_DICTIONARY_BASE_URL`を変更して再deployする。既存`dictionaries/jmdict-v1`へ上書きせず、正常動作を確認するまで旧版を削除せずrollback可能な状態を維持する。`dictionary:browser`は総entry数・ファイル数・bytesと先頭/末尾それぞれの最大shardを出力する。
 
 ### Security
 

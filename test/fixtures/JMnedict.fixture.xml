@@ -3,9 +3,20 @@
   <!ENTITY surname "family or surname">
   <!ENTITY place "place name">
   <!ENTITY organization "organization name">
+  <!ENTITY work "work of art, literature, music, etc. name">
+  <!ENTITY product "product name">
+  <!ENTITY unclass "unclassified name">
 ]>
 <JMnedict>
   <entry><ent_seq>2001</ent_seq><k_ele><keb>田中</keb></k_ele><r_ele><reb>たなか</reb></r_ele><trans><name_type>&surname;</name_type></trans></entry>
   <entry><ent_seq>2002</ent_seq><k_ele><keb>東京</keb></k_ele><r_ele><reb>とうきょう</reb></r_ele><trans><name_type>&place;</name_type></trans></entry>
   <entry><ent_seq>2003</ent_seq><k_ele><keb>辞書協会</keb></k_ele><r_ele><reb>じしょきょうかい</reb></r_ele><trans><name_type>&organization;</name_type></trans></entry>
+  <entry><ent_seq>2004</ent_seq><k_ele><keb>山田</keb></k_ele><r_ele><reb>やまだ</reb></r_ele><trans><name_type>&surname;</name_type></trans></entry>
+  <entry><ent_seq>2005</ent_seq><k_ele><keb>大阪</keb></k_ele><r_ele><reb>おおさか</reb></r_ele><trans><name_type>&place;</name_type></trans></entry>
+  <entry><ent_seq>2006</ent_seq><k_ele><keb>辞書物語</keb></k_ele><r_ele><reb>じしょものがたり</reb></r_ele><trans><name_type>&work;</name_type></trans></entry>
+  <entry><ent_seq>2007</ent_seq><k_ele><keb>辞書ペン</keb></k_ele><r_ele><reb>じしょぺん</reb></r_ele><trans><name_type>&product;</name_type></trans></entry>
+  <entry><ent_seq>2008</ent_seq><k_ele><keb>辞書の森</keb></k_ele><r_ele><reb>じしょのもり</reb></r_ele><trans><name_type>&unknown_name_type;</name_type></trans></entry>
+  <entry><ent_seq>2009</ent_seq><k_ele><keb>ABC123</keb></k_ele><r_ele><reb>えーびーしー</reb></r_ele><trans><name_type>&product;</name_type></trans></entry>
+  <entry><ent_seq>2010</ent_seq><k_ele><keb>日本ABC</keb></k_ele><r_ele><reb>にほんえーびーしー</reb></r_ele><trans><name_type>&organization;</name_type></trans></entry>
+  <entry><ent_seq>2011</ent_seq><k_ele><keb>不正読名</keb></k_ele><r_ele><reb>ABC123</reb></r_ele><trans><name_type>&unclass;</name_type></trans></entry>
 </JMnedict>

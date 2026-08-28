@@ -10,6 +10,7 @@
     "build:app": "vite build",
     "dictionary:build": "npm run build:lib && node dist/cli/buildDictionary.js",
     "dictionary:browser": "npm run build:lib && node --max-old-space-size=2048 dist/cli/buildBrowserDictionary.js",
+    "dictionary:audit": "npm run build:lib && node dist/cli/auditDictionaryCoverage.js",
     "dictionary:blob:upload": "npm run build:lib && node dist/cli/uploadBrowserDictionaryToBlob.js",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.app.json",
     "test": "npm run build:lib && node --test dist/**/*.test.js"
