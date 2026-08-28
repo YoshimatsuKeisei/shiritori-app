@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE JMnedict [
+  <!ENTITY surname "family or surname">
+  <!ENTITY place "place name">
+  <!ENTITY organization "organization name">
+]>
+<JMnedict>
+  <entry><ent_seq>2001</ent_seq><k_ele><keb>田中</keb></k_ele><r_ele><reb>たなか</reb></r_ele><trans><name_type>&surname;</name_type></trans></entry>
+  <entry><ent_seq>2002</ent_seq><k_ele><keb>東京</keb></k_ele><r_ele><reb>とうきょう</reb></r_ele><trans><name_type>&place;</name_type></trans></entry>
+  <entry><ent_seq>2003</ent_seq><k_ele><keb>辞書協会</keb></k_ele><r_ele><reb>じしょきょうかい</reb></r_ele><trans><name_type>&organization;</name_type></trans></entry>
+</JMnedict>

@@ -1,0 +1,8 @@
+node_modules/
+dist/
+web-dist/
+public/dictionary/
+data/raw/*
+!data/raw/README.md
+data/generated/*.json
+data/generated/*.json.gz

@@ -1,0 +1,28 @@
+{
+  "name": "shiritori-dictionary-foundation",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "npm run build:lib && npm run build:app",
+    "build:lib": "tsc -p tsconfig.build.json",
+    "build:app": "vite build",
+    "dictionary:build": "npm run build:lib && node dist/cli/buildDictionary.js",
+    "dictionary:browser": "npm run build:lib && node --max-old-space-size=2048 dist/cli/buildBrowserDictionary.js",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.app.json",
+    "test": "npm run build:lib && node --test dist/**/*.test.js"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
+    "@vitejs/plugin-react": "^6.1.0",
+    "typescript": "^5.9.0",
+    "vite": "^8.2.2"
+  },
+  "dependencies": {
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  }
+}

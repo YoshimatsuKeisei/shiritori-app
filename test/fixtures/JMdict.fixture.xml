@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE JMdict [
+  <!ENTITY n "noun (common) (futsuumeishi)">
+  <!ENTITY v1 "Ichidan verb">
+  <!ENTITY exp "expressions">
+  <!ENTITY proverb "proverb">
+]>
+<JMdict>
+  <entry><ent_seq>1001</ent_seq><k_ele><keb>林檎</keb></k_ele><r_ele><reb>りんご</reb></r_ele><sense><pos>&n;</pos></sense></entry>
+  <entry><ent_seq>1002</ent_seq><r_ele><reb>りす</reb></r_ele><sense><pos>&n;</pos></sense></entry>
+  <entry><ent_seq>1003</ent_seq><r_ele><reb>すいか</reb></r_ele><sense><pos>&n;</pos></sense></entry>
+  <entry><ent_seq>1004</ent_seq><k_ele><keb>蜜柑</keb></k_ele><r_ele><reb>みかん</reb></r_ele><sense><pos>&n;</pos></sense></entry>
+  <entry>
+    <ent_seq>1005</ent_seq>
+    <k_ele><keb>橋</keb></k_ele><k_ele><keb>箸</keb></k_ele><k_ele><keb>端</keb></k_ele>
+    <r_ele><reb>はし</reb></r_ele><sense><pos>&n;</pos></sense>
+  </entry>
+  <entry>
+    <ent_seq>1006</ent_seq>
+    <k_ele><keb>交渉</keb></k_ele><k_ele><keb>校章</keb></k_ele><k_ele><keb>鉱床</keb></k_ele>
+    <r_ele><reb>こうしょう</reb></r_ele><sense><pos>&n;</pos></sense>
+  </entry>
+  <entry><ent_seq>1007</ent_seq><k_ele><keb>スーパー</keb></k_ele><r_ele><reb>スーパー</reb></r_ele><sense><pos>&n;</pos></sense></entry>
+  <entry><ent_seq>1008</ent_seq><r_ele><reb>いしのうえにもさんねん</reb></r_ele><sense><pos>&exp;</pos><misc>&proverb;</misc></sense></entry>
+  <entry><ent_seq>1009</ent_seq><k_ele><keb>食べる</keb></k_ele><r_ele><reb>たべる</reb></r_ele><sense><pos>&v1;</pos></sense></entry>
+  <entry><ent_seq>1010</ent_seq><k_ele><keb>林檎</keb></k_ele><k_ele><keb>林檎</keb></k_ele><r_ele><reb>りんご</reb></r_ele><sense><pos>&n;</pos></sense></entry>
+</JMdict>
