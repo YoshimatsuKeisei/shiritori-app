@@ -117,3 +117,18 @@ test("preloads regular や rather than small ゃ after かいしゃ", async () =
   assert.equal(loader.getShardState("first", "や"), "LOADED");
   assert.equal(loader.getShardState("first", "ゃ"), "UNLOADED");
 });
+
+test("joins external base URLs without double slashes", async () => {
+  for (const base of ["https://example.test/shiritori-dictionary-v1", "https://example.test/shiritori-dictionary-v1/"]) {
+    const calls: string[] = [];
+    const fetcher: DictionaryFetch = async (input) => {
+      calls.push(input);
+      if (input.endsWith("manifest.json")) return { ok: true, json: async () => manifest };
+      return { ok: true, json: async () => first.get("み") };
+    };
+    const loader = new BrowserDictionaryLoader(base, fetcher);
+    await loader.ensureFirstChar("み");
+    assert.equal(calls[0], "https://example.test/shiritori-dictionary-v1/manifest.json");
+    assert.equal(calls[1], `https://example.test/shiritori-dictionary-v1/${manifest.firstCharShards["み"]!.path}`);
+  }
+});

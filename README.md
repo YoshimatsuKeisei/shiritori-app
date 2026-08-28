@@ -123,3 +123,79 @@ GAME OVER後は簡易リザルト、同設定での再戦、設定へ戻る操�
 1文字接続形式では、回答末尾の小書き仮名を次接続に限って通常サイズへ変換する。例えば`かいしゃ → や`となり、`やさい`へ接続できる。Browser SessionもRuleEngineが生成した同じ条件から`by-first/や`を取得する。
 
 TWO_CHARACTERの`かいしゃ → しゃ`、REVERSE、文字数、小書き文字を保持する辞書データは変更していない。Stage 8.1の長音処理も同じhelper内で先に解決する。
+
+## GitHub → Vercel + Vercel Blob deployment
+
+アプリ本体はGitHubからVercelへbuildし、約222MBのブラウザ辞書はPublic Vercel Blob Storeへversion別に配置する。`public/dictionary/`、`web-dist/`、`dist/`はGit管理しない。
+
+### 1. Public Blob Storeを準備
+
+Vercel側でPublic Blob Storeを作成または利用可能にし、read/write tokenを取得する。Dashboardの画面名称は変更されることがあるため、現在のVercel Blob案内に従う。
+
+### 2. tokenをローカルPowerShellへ設定
+
+```powershell
+$env:BLOB_READ_WRITE_TOKEN="<token>"
+```
+
+### 3. 辞書をversion prefixへupload
+
+ブラウザ辞書が未生成なら、先に`npm.cmd run dictionary:browser`を実行する。
+
+```powershell
+npm.cmd run dictionary:blob:upload -- --prefix shiritori-dictionary-v1
+```
+
+CLIは`public/dictionary/`内のshardを最大4並列でuploadし、manifestを最後にuploadする。同一pathnameのoverwriteとrandom suffixは無効。途中失敗したprefixは再利用せず、別のversion prefixを使用する。
+
+完了時に表示される`Dictionary base URL`をコピーする。
+
+### 4. Vercel Projectの公開環境変数
+
+Vercel Projectへ次を設定する。
+
+```text
+VITE_DICTIONARY_BASE_URL=https://<upload結果のpublic-host>/shiritori-dictionary-v1
+```
+
+host名を例から推測せず、CLIが返したURLを使用する。末尾slashの有無はどちらでもよい。未設定のローカル開発では従来どおり`/dictionary`を使用する。
+
+### 5. GitHub repositoryをImport
+
+Vercelで`YoshimatsuKeisei/shiritori-app`をImportし、現在のプロジェクト設定に合わせて次を使用する。
+
+```text
+Build Command: npm run build
+Output Directory: web-dist
+```
+
+GitHubには辞書生成物がなくてもbuildできる。実行時に`VITE_DICTIONARY_BASE_URL`からmanifestと必要shardだけを取得する。
+
+### 6. 以後のアプリ更新
+
+コードだけの変更では通常どおりcommit・pushし、VercelのGit連携でbuildする。辞書の再uploadは不要。
+
+```powershell
+git add .
+git commit -m "..."
+git push
+```
+
+### 辞書更新時
+
+原典を更新した場合だけ、辞書生成、browser shard生成、新しいversion prefixへのuploadを行う。
+
+```powershell
+npm.cmd run dictionary:build -- --jmdict data/raw/JMdict_e.gz
+npm.cmd run dictionary:browser
+npm.cmd run dictionary:blob:upload -- --prefix shiritori-dictionary-v2
+```
+
+Vercelの`VITE_DICTIONARY_BASE_URL`をv2へ変更して再deployする。正常動作を確認するまでv1を削除せず、rollback可能な状態を維持する。
+
+### Security
+
+- `BLOB_READ_WRITE_TOKEN`: secret。Git commit禁止、ブラウザ利用禁止、`VITE_` prefix禁止
+- `VITE_DICTIONARY_BASE_URL`: 公開読み取りURL。ブラウザbundleへ公開されてよい
+- `.env.local`と`.env.*.local`はGit管理外
+- 辞書本体を`git add -f`、Git LFS、Release添付、base64埋込でRepositoryへ追加しない

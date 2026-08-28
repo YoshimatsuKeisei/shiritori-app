@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 
-import { BrowserDictionaryLoader, BrowserDictionarySession, type DictionaryScope } from "../../dictionary/index.js";
+import { BrowserDictionaryLoader, BrowserDictionarySession, getConfiguredBrowserDictionaryBaseUrl, type DictionaryScope } from "../../dictionary/index.js";
 import { START_CHARACTERS, cancelVersusKanjiSelection, checkVersusTimeout, createVersusGame, pauseForDictionaryLoad, resumeAfterDictionaryLoad, selectVersusGameView, selectVersusKanjiCandidate, skipVersusTurn, submitVersusAnswer } from "../../game/index.js";
 import type { DebugGameView, RandomSource, VersusActionResult, VersusGameDependencies, VersusGameState } from "../../game/index.js";
 import type { ConstraintOption, MatchFormat, RejectReason } from "../../rules/index.js";
@@ -14,7 +14,7 @@ import { resolveInitialTimeMs, shouldRunVersusTicker, type VersusSetupValues } f
 const scope: DictionaryScope = { commonNouns: true, proverbs: true, properNouns: true, people: true, places: true, organizations: true, works: true, products: true };
 const clock = { now: () => Date.now() };
 const fixtureMode = new URLSearchParams(window.location.search).get("dictionary") === "fixture";
-const session = new BrowserDictionarySession(new BrowserDictionaryLoader("/dictionary"));
+const session = new BrowserDictionarySession(new BrowserDictionaryLoader(getConfiguredBrowserDictionaryBaseUrl()));
 const defaults: VersusSetupValues = { matchFormat: "NORMAL", constraintOptions: [], timeChoice: 5, customMinutes: 5, skipEnabled: true };
 
 function randomFor(playerValue: number, character: string): RandomSource {

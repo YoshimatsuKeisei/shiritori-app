@@ -1,6 +1,6 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 
-import { BrowserDictionaryLoader, BrowserDictionarySession, type DictionaryScope } from "./dictionary/index.js";
+import { BrowserDictionaryLoader, BrowserDictionarySession, getConfiguredBrowserDictionaryBaseUrl, type DictionaryScope } from "./dictionary/index.js";
 import { cancelKanjiSelection, createDebugGame, selectDebugGameView, selectKanjiCandidate, submitAnswer, START_CHARACTERS } from "./game/index.js";
 import type { CreateDebugGameOptions, DebugGameDependencies, DebugGameState, RandomSource } from "./game/index.js";
 import type { ConstraintOption, MatchFormat } from "./rules/index.js";
@@ -15,7 +15,7 @@ import { CONSTRAINT_OPTION_LABELS, MATCH_FORMAT_LABELS, getConditionCaption, get
 const dictionaryScope: DictionaryScope = { commonNouns: true, proverbs: true, properNouns: true, people: true, places: true, organizations: true, works: true, products: true };
 const clock = { now: () => Date.now() };
 const fixtureMode = new URLSearchParams(window.location.search).get("dictionary") === "fixture";
-const productionSession = new BrowserDictionarySession(new BrowserDictionaryLoader("/dictionary"));
+const productionSession = new BrowserDictionarySession(new BrowserDictionaryLoader(getConfiguredBrowserDictionaryBaseUrl()));
 
 function fixedRandomSource(character: string): RandomSource {
   const index = START_CHARACTERS.indexOf(character);

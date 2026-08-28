@@ -445,3 +445,11 @@ Stage 8.1以降、Sessionは回答読みの先頭shardを取得後、実際の�
 manifest取得Promiseはfetch・parse・validation失敗時に解除し、次回操作で再試行可能とする。shard取得失敗時のcache削除と同じ方針である。
 
 Stage 8.2では`deriveNextConnection`が返す正規サイズの接続かなをそのままshard選択へ利用する。例えば`かいしゃ`のNORMAL回答後は`by-first/や`を取得し、`by-first/ゃ`を候補0件として誤判定しない。
+
+## 23. Stage 8.3 外部静的辞書配信
+
+ブラウザ辞書のBase URLは公開環境変数`VITE_DICTIONARY_BASE_URL`から取得し、空または未設定なら`/dictionary`へfallbackする。末尾slashは除去し、LoaderはVercel Blobを認識せず通常のHTTP Base URLとして扱う。`?dictionary=fixture`では従来どおり外部辞書を使用しない。
+
+再生成可能な`public/dictionary/`はGit管理外を維持する。`dictionary:blob:upload -- --prefix <version>`は配下だけを再帰列挙し、Windows pathをBlob用`/`へ変換する。最大4並列でshardを先にuploadし、全成功後にmanifestを最後に公開する。pathnameはversion prefixと相対pathの決定的な組で、random suffix・overwriteを許可しない。
+
+upload用`BLOB_READ_WRITE_TOKEN`はNode CLIだけが`process.env`から読み、ブラウザコードや`VITE_`変数へ渡さない。upload後はmanifestのSDK返却URLからBase URLを導出するため、Blob hostをコードへ固定しない。
