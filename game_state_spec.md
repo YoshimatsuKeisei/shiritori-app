@@ -309,3 +309,7 @@ totalValidCharacterCount / validAnswerCount
 - 先攻・手番順は再ランダム
 - 開始文字も再ランダム
 - 使用済み語はゲームごとにリセット
+
+## 16. Stage 8.1 ticker条件
+
+React tickerの開始条件は「gameが存在し、GAME_OVERではない」とする。初戦の`undefined → WAITING_FOR_INPUT`でもintervalを生成し、依存変更・unmount時はcleanupして多重生成を防ぐ。`WAITING_FOR_DICTIONARY`中も表示ticker自体は動作可能だが、GameStateの有効残り時間は停止する。

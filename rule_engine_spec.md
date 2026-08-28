@@ -141,3 +141,14 @@ interface RadicalResolver {
 ## 10. ゲーム状態側の責務
 
 候補0件の事前判定、スキップ、タイマー、必要文字数の更新、使用済みキーの登録、プレイヤー脱落はゲーム状態側が担当する。ルールエンジンは状態を変更しない。
+
+## 11. Stage 8.1 長音接続と初手継承
+
+NORMAL、GROWING_LENGTH、FORBIDDEN_CHARACTERでは、読みの末尾が`ー`なら直前の読み文字を接続文字とする。`ResolvedWord.lastChar`と文字数は変更せず、長音も1文字として数える。読みが`ー`だけの場合はfallbackとして`ー`を返す。
+
+- `スーパー` → NORMAL系は`ぱ`
+- `コンピューター` → NORMAL系は`た`
+- TWO_CHARACTERは末尾2文字`ぱー`を維持
+- REVERSEは先頭文字`す`を維持
+
+`REQUIRED_LAST_KANJI`と`REQUIRED_LAST_KANJI_RADICAL`は`previousWord`が存在する2語目以降だけ適用する。初手は独立した`KANJI_ONLY`条件だけを判定する。部首resolver必須の設定validationは維持する。

@@ -12,3 +12,5 @@ Project and format documentation:
 - JMnedict: https://www.edrdg.org/enamdict/enamdict_doc.html
 
 Applications distributing generated dictionary data must retain satisfactory acknowledgement and comply with the current EDRDG terms. This repository does not include the full JMdict or JMnedict source files.
+
+The public setup screen displays links to the JMdict documentation and EDRDG licence listed above. This UI acknowledgement supplements, and does not replace, the applicable licence requirements or dictionary update procedure.

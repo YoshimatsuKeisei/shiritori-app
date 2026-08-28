@@ -5,10 +5,12 @@ import { createWordEntry } from "../createWordEntry.js";
 import type { GeneratedDictionary, WordEntry } from "../types.js";
 import { createBrowserDictionaryManifest, groupEntriesBy } from "./buildBrowserDictionary.js";
 import { BrowserDictionaryLoader, type DictionaryFetch } from "./loader.js";
+import { BrowserDictionarySession } from "./session.js";
 
 const entries: WordEntry[] = [
   ["みらい", "未来"], ["するめ", "鯣"], ["りす", "栗鼠"], ["すいか", "西瓜"],
   ["こうしょう", "交渉"], ["こうしょう", "校章"], ["すーぱー", "スーパー"],
+  ["ようかい", "妖怪"], ["かいしゃ", "会社"], ["ぱんだ", "パンダ"],
 ].map(([reading, surface], index) => createWordEntry({ id: `test-${index}`, source: "JMdict", reading: reading!, surface: surface!, partOfSpeech: ["n"] }));
 
 const dictionary: GeneratedDictionary = {
@@ -79,4 +81,31 @@ test("returns multiple kanji surfaces with the same reading", async () => {
 test("returns a katakana surface from a production-format shard", async () => {
   const { loader } = loaderFixture(); await loader.ensureFirstChar("す");
   assert.equal(loader.repository.findKatakanaCandidatesByReading("すーぱー")[0]?.surface, "スーパー");
+});
+
+test("preloads the first shard of a two-character next connection", async () => {
+  const { loader } = loaderFixture();
+  await new BrowserDictionarySession(loader).ensureAnswerAndNextTurn({ matchFormat: "TWO_CHARACTER" }, "ようかい");
+  assert.equal(loader.getShardState("first", "か"), "LOADED");
+  assert.equal(loader.getShardState("first", "い"), "UNLOADED");
+});
+
+test("preloads the kana before a trailing long mark for normal play", async () => {
+  const { loader } = loaderFixture();
+  await new BrowserDictionarySession(loader).ensureAnswerAndNextTurn({ matchFormat: "NORMAL" }, "すーぱー");
+  assert.equal(loader.getShardState("first", "ぱ"), "LOADED");
+  assert.equal(loader.getShardState("first", "ー"), "UNLOADED");
+});
+
+test("retries manifest fetch after a rejected request", async () => {
+  let attempts = 0;
+  const fetcher: DictionaryFetch = async () => {
+    attempts += 1;
+    if (attempts === 1) return { ok: false, json: async () => undefined };
+    return { ok: true, json: async () => manifest };
+  };
+  const loader = new BrowserDictionaryLoader("/dictionary", fetcher);
+  await assert.rejects(loader.loadManifest());
+  assert.equal((await loader.loadManifest()).totalEntries, entries.length);
+  assert.equal(attempts, 2);
 });

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import type { VersusGameState, VersusPlayer } from "../../game/index.js";
-import { formatAverageCharacters, formatAverageTime, formatRemainingTime, isSkipDisabled, resolveInitialTimeMs } from "./helpers.js";
+import { formatAverageCharacters, formatAverageTime, formatRemainingTime, isSkipDisabled, resolveInitialTimeMs, shouldRunVersusTicker } from "./helpers.js";
 
 test("formats selector milliseconds as ceiling MM:SS without negatives", () => {
   assert.equal(formatRemainingTime(300_000), "05:00");
@@ -40,4 +40,12 @@ test("enables skip only for an input-waiting player with a remaining charge", ()
 
 test("always disables skip for growing length", () => {
   assert.equal(isSkipDisabled(skipState("GROWING_LENGTH", 1), false), true);
+});
+
+test("starts the ticker for the first live game and stops only at game over", () => {
+  assert.equal(shouldRunVersusTicker(undefined), false);
+  assert.equal(shouldRunVersusTicker({ status: "WAITING_FOR_INPUT" }), true);
+  assert.equal(shouldRunVersusTicker({ status: "WAITING_FOR_KANJI_SELECTION" }), true);
+  assert.equal(shouldRunVersusTicker({ status: "WAITING_FOR_DICTIONARY" }), true);
+  assert.equal(shouldRunVersusTicker({ status: "GAME_OVER" }), false);
 });

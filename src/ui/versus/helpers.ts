@@ -9,6 +9,10 @@ export interface VersusSetupValues {
   skipEnabled: boolean;
 }
 
+export function shouldRunVersusTicker(game: Pick<VersusGameState, "status"> | undefined): boolean {
+  return game !== undefined && game.status !== "GAME_OVER";
+}
+
 export function resolveInitialTimeMs(values: Pick<VersusSetupValues, "timeChoice" | "customMinutes">): number {
   const minutes = values.timeChoice === "CUSTOM" ? Math.min(60, Math.max(1, Math.trunc(values.customMinutes))) : values.timeChoice;
   return minutes * 60_000;

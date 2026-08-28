@@ -194,6 +194,8 @@ button { cursor: pointer; }
 .setup-note { color: #837d72; font-size: 12px; line-height: 1.5; }
 .setup-error { color: #b84631; font-size: 12px; }
 .setup-start { width: 100%; min-height: 50px; margin-top: 8px; }
+.dictionary-credit { margin-top: 18px; color: #938d82; font-size: 10px; text-align: center; }
+.dictionary-credit a { color: #766d62; text-underline-offset: 2px; }
 .setup-debug-badge { position: fixed; right: 18px; bottom: 18px; padding: 6px 9px; border-radius: 6px; background: #292720; color: white; font-size: 9px; letter-spacing: .12em; }
 
 .versus-panel { position: relative; }

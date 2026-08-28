@@ -1,5 +1,7 @@
+import { resolveWordEntry } from "../createWordEntry.js";
 import { normalizeReading } from "../japaneseText.js";
 import type { DebugGameState } from "../../game/types.js";
+import { deriveNextConnection } from "../../rules/evaluate.js";
 import type { BrowserDictionaryManifest } from "./types.js";
 import { BrowserDictionaryLoader } from "./loader.js";
 
@@ -18,12 +20,16 @@ export class BrowserDictionarySession {
 
   async ensureAnswerAndNextTurn(state: Pick<DebugGameState, "matchFormat">, input: string): Promise<void> {
     const reading = normalizeReading(input);
-    const characters = Array.from(reading);
-    const first = characters[0];
-    const last = characters.at(-1);
-    if (!first || !last) return;
+    const first = Array.from(reading)[0];
+    if (!first) return;
     await this.loader.ensureFirstChar(first);
-    if (state.matchFormat === "REVERSE") await this.loader.ensureLastChar(first);
-    else await this.loader.ensureFirstChar(last);
+    const entry = this.loader.repository.findByReading(reading)[0];
+    if (!entry) return;
+    const connection = deriveNextConnection(state.matchFormat, resolveWordEntry(entry, input));
+    if (connection.type === "CATEGORY") return;
+    const shardCharacter = Array.from(connection.value)[0];
+    if (!shardCharacter) return;
+    if (connection.type === "ENDS_WITH") await this.loader.ensureLastChar(shardCharacter);
+    else await this.loader.ensureFirstChar(shardCharacter);
   }
 }

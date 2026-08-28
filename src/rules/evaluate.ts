@@ -28,7 +28,7 @@ function connectionRejectReason(context: RuleEvaluationContext): RejectReason | 
     ? previousWord.lastTwoChars === currentWord.firstTwoChars
     : matchFormat === "REVERSE"
       ? previousWord.firstChar === currentWord.lastChar
-      : previousWord.lastChar === currentWord.firstChar;
+      : getSingleCharacterConnection(previousWord) === currentWord.firstChar;
   return matches ? undefined : "CONNECTION_MISMATCH";
 }
 
@@ -52,6 +52,13 @@ function radicalMatches(
 export function hasRequiredLastKanji(previousWord: ResolvedWord, currentWord: ResolvedWord): boolean {
   const requiredKanji = previousWord.kanjiChars.at(-1);
   return requiredKanji !== undefined && currentWord.kanjiChars.includes(requiredKanji);
+}
+
+/** Returns the connection kana for one-character formats without changing character counts. */
+export function getSingleCharacterConnection(word: ResolvedWord): string {
+  if (word.lastChar !== "ー") return word.lastChar;
+  const characters = Array.from(word.normalizedReading);
+  return characters.at(-2) ?? word.lastChar;
 }
 
 export function evaluateAnswer(context: RuleEvaluationContext): RuleEvaluationResult {
@@ -84,13 +91,13 @@ export function evaluateAnswer(context: RuleEvaluationContext): RuleEvaluationRe
     }
   }
 
-  if (hasOption(context.constraintOptions, "REQUIRED_LAST_KANJI")) {
-    if (!context.previousWord || !hasRequiredLastKanji(context.previousWord, context.currentWord)) {
+  if (context.previousWord && hasOption(context.constraintOptions, "REQUIRED_LAST_KANJI")) {
+    if (!hasRequiredLastKanji(context.previousWord, context.currentWord)) {
       return rejected("REQUIRED_KANJI_MISSING");
     }
   }
-  if (hasOption(context.constraintOptions, "REQUIRED_LAST_KANJI_RADICAL")) {
-    if (!context.previousWord || !radicalMatches(context.previousWord, context.currentWord, context.radicalResolver)) {
+  if (context.previousWord && hasOption(context.constraintOptions, "REQUIRED_LAST_KANJI_RADICAL")) {
+    if (!radicalMatches(context.previousWord, context.currentWord, context.radicalResolver)) {
       return rejected("RADICAL_MISMATCH");
     }
   }
@@ -107,5 +114,5 @@ export function deriveNextConnection(matchFormat: MatchFormat, acceptedWord: Res
     return { type: "ENDS_WITH", value: acceptedWord.firstChar };
   }
   if (matchFormat === "CATEGORY_MASTER") return { type: "CATEGORY" };
-  return { type: "STARTS_WITH", value: acceptedWord.lastChar };
+  return { type: "STARTS_WITH", value: getSingleCharacterConnection(acceptedWord) };
 }

@@ -25,13 +25,13 @@ export function getNavigationText(view: DebugGameView): string {
 export function getRejectReasonMessage(reason: RejectReason, view: DebugGameView): string {
   switch (reason) {
     case "WORD_NOT_FOUND": return "辞書にありません";
-    case "ALREADY_USED": return "使用済みです";
+    case "ALREADY_USED": return "既に使用されています";
     case "CONNECTION_MISMATCH":
-    case "INVALID_INITIAL_CONDITION": return getNavigationText(view).replace("言葉を入力してください", "言葉ではありません");
+    case "INVALID_INITIAL_CONDITION": return getNavigationText(view);
     case "LENGTH_MISMATCH": return `${view.requiredLength ?? "指定された"}文字で回答してください`;
     case "FORBIDDEN_CHARACTER": return "禁止文字を含んでいます";
-    case "KANJI_REQUIRED": return "漢字語ではありません";
-    case "KATAKANA_REQUIRED": return "カタカナ語ではありません";
+    case "KANJI_REQUIRED": return "漢字表記が見つかりません";
+    case "KATAKANA_REQUIRED": return "カタカナ表記が見つかりません";
     case "REQUIRED_KANJI_MISSING": return "前の言葉の最後の漢字が含まれていません";
     case "RADICAL_MISMATCH": return "指定された部首条件を満たしていません";
     case "CATEGORY_NOT_IMPLEMENTED": return "カテゴリマスターは未実装です";

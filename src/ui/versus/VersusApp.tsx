@@ -9,7 +9,7 @@ import { browserDictionaryRepository } from "../debugDictionary.js";
 import { getRejectReasonMessage } from "../presentation.js";
 import { VersusPlayScreen } from "./VersusPlayScreen.js";
 import { VersusSetup } from "./VersusSetup.js";
-import { resolveInitialTimeMs, type VersusSetupValues } from "./helpers.js";
+import { resolveInitialTimeMs, shouldRunVersusTicker, type VersusSetupValues } from "./helpers.js";
 
 const scope: DictionaryScope = { commonNouns: true, proverbs: true, properNouns: true, people: true, places: true, organizations: true, works: true, products: true };
 const clock = { now: () => Date.now() };
@@ -94,7 +94,7 @@ export function VersusApp() {
   };
 
   useEffect(() => {
-    if (!game || game.status === "GAME_OVER") return;
+    if (!shouldRunVersusTicker(game)) return;
     const interval = window.setInterval(() => {
       setTick((value) => value + 1);
       setGame((current) => {
@@ -104,7 +104,7 @@ export function VersusApp() {
       });
     }, 200);
     return () => window.clearInterval(interval);
-  }, [game?.status === "GAME_OVER"]);
+  }, [Boolean(game), game?.status]);
   useEffect(() => { if (game?.status === "WAITING_FOR_INPUT" && !loading) inputRef.current?.focus(); }, [game?.currentPlayerId, game?.status, loading]);
 
   if (screen === "SETUP" || !game) return <main className="app-shell"><VersusSetup values={setup} onChange={setSetup} onStart={() => void startGame()} loading={loading} {...(message ? { error: message } : {})} />{fixtureMode && <span className="setup-debug-badge">DEBUG DICTIONARY</span>}</main>;

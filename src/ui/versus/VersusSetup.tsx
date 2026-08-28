@@ -23,5 +23,6 @@ export function VersusSetup({ values, onChange, onStart, loading, error }: Props
     {!validation.valid && <p className="setup-error">制約オプションの組み合わせが正しくありません。</p>}
     {error && <p className="setup-error" role="alert">{error}</p>}
     <button className="primary-button setup-start" type="button" disabled={loading || !validation.valid} onClick={onStart}>{loading ? "辞書を読み込み中..." : "START"}</button>
+    <footer className="dictionary-credit">Dictionary data: <a href="https://www.edrdg.org/jmdict/j_jmdict.html" target="_blank" rel="noreferrer">JMdict</a> / <a href="https://www.edrdg.org/edrdg/licence.html" target="_blank" rel="noreferrer">EDRDG licence</a></footer>
   </section>;
 }

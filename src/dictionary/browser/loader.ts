@@ -15,7 +15,7 @@ export class BrowserDictionaryLoader {
   readonly #cache = new Map<string, Promise<readonly WordEntry[]>>();
   readonly #loaded = new Set<string>();
   readonly #entries = new Map<string, WordEntry>();
-  #manifestPromise?: Promise<BrowserDictionaryManifest>;
+  #manifestPromise: Promise<BrowserDictionaryManifest> | undefined;
   #repository = new InMemoryDictionaryRepository([]);
 
   constructor(baseUrl = "/dictionary", fetcher: DictionaryFetch = (input) => fetch(input)) {
@@ -24,13 +24,20 @@ export class BrowserDictionaryLoader {
   }
 
   async loadManifest(): Promise<BrowserDictionaryManifest> {
-    this.#manifestPromise ??= this.#fetchJson(`${this.#baseUrl}/manifest.json`).then((value) => {
+    if (this.#manifestPromise) return this.#manifestPromise;
+    const promise = this.#fetchJson(`${this.#baseUrl}/manifest.json`).then((value) => {
       if (!value || typeof value !== "object" || !("totalEntries" in value) || !("firstCharShards" in value) || !("lastCharShards" in value)) {
         throw new Error("Invalid browser dictionary manifest.");
       }
       return value as BrowserDictionaryManifest;
     });
-    return this.#manifestPromise;
+    this.#manifestPromise = promise;
+    try {
+      return await promise;
+    } catch (error: unknown) {
+      if (this.#manifestPromise === promise) this.#manifestPromise = undefined;
+      throw error;
+    }
   }
 
   get repository(): InMemoryDictionaryRepository {

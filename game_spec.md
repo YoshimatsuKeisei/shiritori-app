@@ -329,3 +329,7 @@ A → C → D → A → ...
 - ルールプリセット
 - 辞書難易度
 - マニアック語許可設定
+
+## 14. Stage 8.1修正
+
+初戦生成直後から表示tickerを開始し、GameStateとClockから残り時間を常時再描画する。`WAITING_FOR_DICTIONARY`と`GAME_OVER`では時間を減算しない。NORMAL、GROWING_LENGTH、FORBIDDEN_CHARACTERで長音終端の語を受理した場合、次接続には長音直前のかなを使用する。

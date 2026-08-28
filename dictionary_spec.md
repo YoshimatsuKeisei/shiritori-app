@@ -439,3 +439,7 @@ JMdictの通常採用語は`commonNouns`、ことわざタグ付き語は`prover
 ファイル名はUnicodeコードポイントによる決定的なASCII名とする。`BrowserDictionaryLoader`はmanifestと必要shardだけをfetchし、同一セッションではPromise cacheにより重複取得しない。状態は`UNLOADED`、`LOADING`、`LOADED`を区別し、未ロード範囲を候補0件と解釈してはならない。
 
 React側の`BrowserDictionarySession`が必要範囲を非同期に保証した後、ロード済みentryで構築した既存`InMemoryDictionaryRepository`を同期GameStateへ渡す。出典情報は原典metadataをmanifestへ保持し、`NOTICE.md`の条件を引き継ぐ。
+
+Stage 8.1以降、Sessionは回答読みの先頭shardを取得後、実際の候補を`ResolvedWord`化し、ルールエンジンの`deriveNextConnection`から次shardを決定する。TWO_CHARACTERでは次条件2文字の先頭、通常系の長音終端では直前かな、REVERSEでは先頭文字に対応する末尾shardを取得する。
+
+manifest取得Promiseはfetch・parse・validation失敗時に解除し、次回操作で再試行可能とする。shard取得失敗時のcache削除と同じ方針である。

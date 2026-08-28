@@ -139,6 +139,19 @@ test("evaluates required last kanji and injected radical resolver", () => {
   assert.deepEqual(radicalResult, { valid: true });
 });
 
+test("does not require a previous kanji or radical on the first turn", () => {
+  const first = word("おんがく", "音楽", "kanji");
+  assert.deepEqual(evaluateAnswer(context(first, "NORMAL", {
+    initialChar: "お",
+    constraintOptions: ["KANJI_ONLY", "REQUIRED_LAST_KANJI"],
+  })), { valid: true });
+  assert.deepEqual(evaluateAnswer(context(first, "NORMAL", {
+    initialChar: "お",
+    constraintOptions: ["KANJI_ONLY", "REQUIRED_LAST_KANJI_RADICAL"],
+    radicalResolver: { getRadicalId: () => "wood" },
+  })), { valid: true });
+});
+
 test("returns END_WITH_N only after ordinary rules pass", () => {
   assert.deepEqual(evaluateAnswer(context(word("みかん"), "NORMAL", { initialChar: "み" })), {
     valid: false,
@@ -152,7 +165,23 @@ test("returns END_WITH_N only after ordinary rules pass", () => {
 
 test("derives next connections without mutating game state", () => {
   const accepted = word("すーぱー");
-  assert.deepEqual(deriveNextConnection("NORMAL", accepted), { type: "STARTS_WITH", value: "ー" });
+  assert.deepEqual(deriveNextConnection("NORMAL", accepted), { type: "STARTS_WITH", value: "ぱ" });
   assert.deepEqual(deriveNextConnection("TWO_CHARACTER", accepted), { type: "STARTS_WITH_TWO", value: "ぱー" });
   assert.deepEqual(deriveNextConnection("REVERSE", accepted), { type: "ENDS_WITH", value: "す" });
+});
+
+test("uses the kana before a long mark in normal single-character formats", () => {
+  assert.deepEqual(deriveNextConnection("NORMAL", word("こんぴゅーたー")), { type: "STARTS_WITH", value: "た" });
+  assert.deepEqual(deriveNextConnection("GROWING_LENGTH", word("すーぱー")), { type: "STARTS_WITH", value: "ぱ" });
+  assert.deepEqual(deriveNextConnection("FORBIDDEN_CHARACTER", word("すーぱー")), { type: "STARTS_WITH", value: "ぱ" });
+  assert.deepEqual(evaluateAnswer(context(word("ぱんだ"), "NORMAL", { previousWord: word("すーぱー") })), { valid: true });
+});
+
+test("keeps a long mark in two-character connections and reverse unchanged", () => {
+  assert.deepEqual(deriveNextConnection("TWO_CHARACTER", word("すーぱー")), { type: "STARTS_WITH_TWO", value: "ぱー" });
+  assert.deepEqual(deriveNextConnection("REVERSE", word("すーぱー")), { type: "ENDS_WITH", value: "す" });
+});
+
+test("safely falls back when a reading consists only of a long mark", () => {
+  assert.deepEqual(deriveNextConnection("NORMAL", word("ー")), { type: "STARTS_WITH", value: "ー" });
 });
