@@ -6,6 +6,7 @@ import {
   deriveNextConnection,
   evaluateAnswer,
   hasRequiredLastKanji,
+  normalizeSmallKanaForConnection,
   resolveForbiddenCharacters,
   validateRuleConfiguration,
 } from "./index.js";
@@ -184,4 +185,28 @@ test("keeps a long mark in two-character connections and reverse unchanged", () 
 
 test("safely falls back when a reading consists only of a long mark", () => {
   assert.deepEqual(deriveNextConnection("NORMAL", word("ー")), { type: "STARTS_WITH", value: "ー" });
+});
+
+test("normalizes small hiragana only for single-character connections", () => {
+  const mappings = { "ゃ": "や", "ゅ": "ゆ", "ょ": "よ", "っ": "つ", "ぁ": "あ", "ぃ": "い", "ぅ": "う", "ぇ": "え", "ぉ": "お", "ゎ": "わ" } as const;
+  for (const [small, regular] of Object.entries(mappings)) assert.equal(normalizeSmallKanaForConnection(small), regular);
+  assert.equal(normalizeSmallKanaForConnection("ぷ"), "ぷ");
+});
+
+test("uses regular-sized kana after words ending in small kana", () => {
+  assert.deepEqual(deriveNextConnection("NORMAL", word("かいしゃ")), { type: "STARTS_WITH", value: "や" });
+  assert.deepEqual(deriveNextConnection("NORMAL", word("かんじゃ")), { type: "STARTS_WITH", value: "や" });
+  assert.deepEqual(deriveNextConnection("GROWING_LENGTH", word("かいしゃ")), { type: "STARTS_WITH", value: "や" });
+  assert.deepEqual(deriveNextConnection("FORBIDDEN_CHARACTER", word("かいしゃ")), { type: "STARTS_WITH", value: "や" });
+  assert.deepEqual(evaluateAnswer(context(word("やさい"), "NORMAL", { previousWord: word("かいしゃ") })), { valid: true });
+});
+
+test("keeps small kana in two-character connections and leaves reverse unchanged", () => {
+  assert.deepEqual(deriveNextConnection("TWO_CHARACTER", word("かいしゃ")), { type: "STARTS_WITH_TWO", value: "しゃ" });
+  assert.deepEqual(deriveNextConnection("REVERSE", word("かいしゃ")), { type: "ENDS_WITH", value: "か" });
+});
+
+test("handles isolated and long-marked small kana defensively", () => {
+  assert.deepEqual(deriveNextConnection("NORMAL", word("ゃ")), { type: "STARTS_WITH", value: "や" });
+  assert.deepEqual(deriveNextConnection("NORMAL", word("ゃー")), { type: "STARTS_WITH", value: "や" });
 });

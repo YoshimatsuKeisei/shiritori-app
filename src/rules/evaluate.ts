@@ -54,11 +54,20 @@ export function hasRequiredLastKanji(previousWord: ResolvedWord, currentWord: Re
   return requiredKanji !== undefined && currentWord.kanjiChars.includes(requiredKanji);
 }
 
+const SMALL_KANA_CONNECTIONS: Readonly<Record<string, string>> = {
+  "ゃ": "や", "ゅ": "ゆ", "ょ": "よ", "っ": "つ",
+  "ぁ": "あ", "ぃ": "い", "ぅ": "う", "ぇ": "え", "ぉ": "お", "ゎ": "わ",
+};
+
+export function normalizeSmallKanaForConnection(character: string): string {
+  return SMALL_KANA_CONNECTIONS[character] ?? character;
+}
+
 /** Returns the connection kana for one-character formats without changing character counts. */
 export function getSingleCharacterConnection(word: ResolvedWord): string {
-  if (word.lastChar !== "ー") return word.lastChar;
   const characters = Array.from(word.normalizedReading);
-  return characters.at(-2) ?? word.lastChar;
+  const resolved = word.lastChar === "ー" ? characters.at(-2) ?? word.lastChar : word.lastChar;
+  return normalizeSmallKanaForConnection(resolved);
 }
 
 export function evaluateAnswer(context: RuleEvaluationContext): RuleEvaluationResult {

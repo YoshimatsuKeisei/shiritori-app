@@ -152,3 +152,9 @@ NORMAL、GROWING_LENGTH、FORBIDDEN_CHARACTERでは、読みの末尾が`ー`な
 - REVERSEは先頭文字`す`を維持
 
 `REQUIRED_LAST_KANJI`と`REQUIRED_LAST_KANJI_RADICAL`は`previousWord`が存在する2語目以降だけ適用する。初手は独立した`KANJI_ONLY`条件だけを判定する。部首resolver必須の設定validationは維持する。
+
+## 12. Stage 8.2 小書き仮名の1文字接続
+
+NORMAL、GROWING_LENGTH、FORBIDDEN_CHARACTERでは、長音を解決した後の接続文字が小書き仮名なら通常サイズへ変換する。対象は`ゃ→や`、`ゅ→ゆ`、`ょ→よ`、`っ→つ`、`ぁ→あ`、`ぃ→い`、`ぅ→う`、`ぇ→え`、`ぉ→お`、`ゎ→わ`。
+
+変換は次接続の生成と接続判定だけに適用し、`normalizedReading`、`lastChar`、`lastTwoChars`、`characterCount`は変更しない。TWO_CHARACTERは末尾2文字をそのまま保持し、REVERSEも先頭文字条件を維持する。

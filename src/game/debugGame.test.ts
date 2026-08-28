@@ -171,6 +171,15 @@ test("deterministically confirms katakana and displays its surface", () => {
   assert.equal(result.state.usedNormalKeys.has("すーぱー"), true);
 });
 
+test("continues from a trailing small kana without a false NO_VALID_WORD", () => {
+  const session = start([entry("かいしゃ", "会社"), entry("やさい", "野菜"), entry("いか", "烏賊")], "か");
+  const first = submitAnswer(session.state, "かいしゃ", session.dependencies);
+  assert.equal(first.outcome, "ACCEPTED");
+  assert.deepEqual(first.state.currentConnection, { type: "STARTS_WITH", value: "や" });
+  assert.notEqual(first.state.gameOverReason, "NO_VALID_WORD");
+  assert.equal(submitAnswer(first.state, "やさい", session.dependencies).outcome, "ACCEPTED");
+});
+
 test("reports strict zero-candidate turns but rejects unsupported setup", () => {
   const emptySession = start([entry("りす")], "ぬ");
   assert.equal(emptySession.state.status, "GAME_OVER");

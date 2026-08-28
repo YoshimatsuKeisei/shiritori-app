@@ -11,6 +11,7 @@ const entries: WordEntry[] = [
   ["みらい", "未来"], ["するめ", "鯣"], ["りす", "栗鼠"], ["すいか", "西瓜"],
   ["こうしょう", "交渉"], ["こうしょう", "校章"], ["すーぱー", "スーパー"],
   ["ようかい", "妖怪"], ["かいしゃ", "会社"], ["ぱんだ", "パンダ"],
+  ["やさい", "野菜"],
 ].map(([reading, surface], index) => createWordEntry({ id: `test-${index}`, source: "JMdict", reading: reading!, surface: surface!, partOfSpeech: ["n"] }));
 
 const dictionary: GeneratedDictionary = {
@@ -108,4 +109,11 @@ test("retries manifest fetch after a rejected request", async () => {
   await assert.rejects(loader.loadManifest());
   assert.equal((await loader.loadManifest()).totalEntries, entries.length);
   assert.equal(attempts, 2);
+});
+
+test("preloads regular や rather than small ゃ after かいしゃ", async () => {
+  const { loader } = loaderFixture();
+  await new BrowserDictionarySession(loader).ensureAnswerAndNextTurn({ matchFormat: "NORMAL" }, "かいしゃ");
+  assert.equal(loader.getShardState("first", "や"), "LOADED");
+  assert.equal(loader.getShardState("first", "ゃ"), "UNLOADED");
 });
