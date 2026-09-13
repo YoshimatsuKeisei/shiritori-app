@@ -33,3 +33,12 @@ test("accepts repeated readings and an optional dictionary path", () => {
   assert.match(parsed.dictionaryPath, /tmp[\\/]dictionary\.json$/);
   assert.throws(() => parseAuditArguments([]), /At least one --reading/);
 });
+
+test("audit displays all categories alongside primary and original tags", () => {
+  const entry = createWordEntry({ id: "multi", source: "JMnedict", reading: "とうきょう", surface: "東京", properNounType: "PERSON", properNounTypes: ["PERSON", "PLACE"], semanticTags: ["place", "surname"] });
+  const output = formatCoverageAudit(auditDictionaryCoverage([entry], ["とうきょう"]));
+  assert.match(output, /properNounType: PERSON\n/);
+  assert.match(output, /properNounTypes: PERSON, PLACE\n/);
+  assert.match(output, /semanticTags: place, surname/);
+  assert.match(formatCoverageCandidate(entries[1]!), /properNounTypes: -\n/);
+});

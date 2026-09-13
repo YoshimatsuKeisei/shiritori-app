@@ -1,6 +1,7 @@
 import type { GeneratedDictionary, WordEntry } from "../types.js";
 import type { BrowserDictionaryManifest, BrowserDictionaryShardInfo } from "./types.js";
 
+/** Legacy uncompressed manifest helpers; production gzip generation is Node-only. */
 export const BROWSER_DICTIONARY_SCHEMA_VERSION = 1;
 
 export function shardFileName(character: string): string {

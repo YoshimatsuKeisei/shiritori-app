@@ -38,6 +38,7 @@ export function formatCoverageCandidate(entry: WordEntry): string {
     `  reading: ${entry.reading}`,
     `  surface: ${entry.surface}`,
     `  properNounType: ${entry.properNounType ?? "-"}`,
+    `  properNounTypes: ${entry.properNounTypes?.join(", ") || "-"}`,
     `  partOfSpeech: ${entry.partOfSpeech.join(", ") || "-"}`,
     `  semanticTags: ${entry.semanticTags.join(", ") || "-"}`,
   ].join("\n");

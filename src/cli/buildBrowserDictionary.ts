@@ -1,11 +1,8 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { basename, dirname, resolve } from "node:path";
+import { readFile } from "node:fs/promises";
+import { basename, resolve } from "node:path";
 
-import {
-  createBrowserDictionaryManifest,
-  groupEntriesBy,
-} from "../dictionary/browser/buildBrowserDictionary.js";
-import type { GeneratedDictionary, WordEntry } from "../dictionary/types.js";
+import { buildGzipBrowserDictionary } from "../dictionary/browser/nodeBuildBrowserDictionary.js";
+import type { GeneratedDictionary } from "../dictionary/types.js";
 
 interface Arguments { inputPath: string; outputDirectory: string }
 
@@ -23,35 +20,14 @@ function parseArguments(values: readonly string[]): Arguments {
   return { inputPath, outputDirectory };
 }
 
-async function writeGroups(output: string, groups: ReadonlyMap<string, readonly WordEntry[]>, infos: Record<string, { path: string }>): Promise<void> {
-  for (const [character, entries] of groups) {
-    const target = resolve(output, infos[character]!.path);
-    await mkdir(dirname(target), { recursive: true });
-    await writeFile(target, JSON.stringify(entries));
-  }
-}
-
 async function main(): Promise<void> {
   const options = parseArguments(process.argv.slice(2));
   const input = resolve(options.inputPath);
   const output = resolve(options.outputDirectory);
   const dictionary = JSON.parse(await readFile(input, "utf8")) as GeneratedDictionary;
-  if (!Array.isArray(dictionary.entries)) throw new Error("Invalid generated dictionary.");
-  const first = groupEntriesBy(dictionary.entries, (entry) => entry.firstChar);
-  const last = groupEntriesBy(dictionary.entries, (entry) => entry.lastChar);
-  const manifest = createBrowserDictionaryManifest(dictionary, first, last, basename(input));
-  await mkdir(output, { recursive: true });
-  await writeGroups(output, first, manifest.firstCharShards);
-  await writeGroups(output, last, manifest.lastCharShards);
-  const serializedManifest = JSON.stringify(manifest, null, 2);
-  await writeFile(resolve(output, "manifest.json"), serializedManifest);
-  const firstBytes = Object.values(manifest.firstCharShards).reduce((sum, shard) => sum + shard.bytes, 0);
-  const lastBytes = Object.values(manifest.lastCharShards).reduce((sum, shard) => sum + shard.bytes, 0);
-  const all = [...Object.entries(manifest.firstCharShards).map(([character, shard]) => ({ direction: "first", character, ...shard })), ...Object.entries(manifest.lastCharShards).map(([character, shard]) => ({ direction: "last", character, ...shard }))];
-  const largestFirstShard = [...Object.entries(manifest.firstCharShards)].map(([character, shard]) => ({ direction: "first", character, ...shard })).sort((left, right) => right.bytes - left.bytes)[0];
-  const largestLastShard = [...Object.entries(manifest.lastCharShards)].map(([character, shard]) => ({ direction: "last", character, ...shard })).sort((left, right) => right.bytes - left.bytes)[0];
-  const manifestBytes = Buffer.byteLength(serializedManifest);
-  console.log(JSON.stringify({ totalEntries: manifest.totalEntries, totalFiles: all.length + 1, firstShards: first.size, lastShards: last.size, firstBytes, lastBytes, manifestBytes, totalBytes: firstBytes + lastBytes + manifestBytes, averageShardBytes: all.length === 0 ? 0 : Math.round((firstBytes + lastBytes) / all.length), largestFirstShard, largestLastShard }, null, 2));
+  const result = await buildGzipBrowserDictionary(dictionary, output, basename(input));
+  console.log(JSON.stringify(result.statistics, null, 2));
+  console.log("gzip reduces transfer/storage bytes; expanded JSON and parsed object memory are unchanged.");
 }
 
 await main();

@@ -1,5 +1,6 @@
 import { basename } from "node:path";
 import { access } from "node:fs/promises";
+import { getProperNounTypes } from "../properNounTypes.js";
 
 import type { DictionaryStatistics, GeneratedDictionary, ProperNounType, WordEntry } from "../types.js";
 import { parseJmdictEntry } from "./jmdict.js";
@@ -14,6 +15,7 @@ export function wordEntryDeduplicationKey(entry: WordEntry): string {
     entry.normalizedReading,
     entry.normalizedSurface,
     entry.properNounType ?? "",
+    [...new Set(entry.properNounTypes ?? [])].sort().join(","),
     [...entry.partOfSpeech].sort().join(","),
     [...entry.semanticTags].sort().join(","),
   ].join("\u0000");
@@ -51,7 +53,9 @@ export function calculateDictionaryStatistics(entries: readonly WordEntry[]): Di
       else commonNouns += 1;
     } else {
       jmnedict += 1;
-      properNounCounts[entry.properNounType ?? "OTHER"] += 1;
+      for (const category of new Set(getProperNounTypes(entry))) {
+        properNounCounts[category] += 1;
+      }
     }
   }
   return {

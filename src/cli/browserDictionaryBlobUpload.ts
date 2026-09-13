@@ -1,4 +1,4 @@
-import { readdir, readFile, stat } from "node:fs/promises";
+import { lstat, readdir, readFile, stat } from "node:fs/promises";
 import { join, relative, resolve, sep } from "node:path";
 
 import type { BrowserDictionaryManifest } from "../dictionary/browser/types.js";
@@ -13,6 +13,17 @@ export interface BrowserDictionaryUploadFile {
 
 export interface BlobUploadResult { url: string }
 export type BlobUploadFunction = (file: BrowserDictionaryUploadFile, token: string) => Promise<BlobUploadResult>;
+
+export function dictionaryBlobPutOptions(file: BrowserDictionaryUploadFile, token: string) {
+  const gzip = file.relativePath.endsWith(".json.gz");
+  if (!gzip && !file.relativePath.endsWith(".json")) throw new Error("Unsupported dictionary file extension.");
+  return {
+    access: "public" as const, token,
+    contentType: gzip ? "application/gzip" : "application/json",
+    addRandomSuffix: false, allowOverwrite: false,
+    multipart: file.bytes >= 4_000_000,
+  };
+}
 
 export function normalizeBlobPrefix(value: string): string {
   const prefix = value.trim().replace(/^\/+|\/+$/g, "");
@@ -36,7 +47,10 @@ async function collectFiles(directory: string): Promise<string[]> {
   const result: string[] = [];
   for (const item of await readdir(directory, { withFileTypes: true })) {
     const path = join(directory, item.name);
-    if (item.isDirectory()) result.push(...await collectFiles(path));
+    if (item.isSymbolicLink()) throw new Error(`Dictionary upload must not follow symbolic links: ${path}`);
+    if (item.isDirectory()) {
+      for (const file of await collectFiles(path)) result.push(file);
+    }
     else if (item.isFile()) result.push(path);
   }
   return result;
@@ -45,6 +59,27 @@ async function collectFiles(directory: string): Promise<string[]> {
 function validateManifest(value: unknown): asserts value is BrowserDictionaryManifest {
   if (!value || typeof value !== "object" || !("totalEntries" in value) || !("firstCharShards" in value) || !("lastCharShards" in value)) {
     throw new Error("Browser dictionary manifest is invalid.");
+  }
+  for (const direction of ["first", "last"] as const) {
+    const shards = direction === "first" ? value.firstCharShards : value.lastCharShards;
+    if (!shards || typeof shards !== "object" || Array.isArray(shards)) throw new Error("Invalid dictionary shard map.");
+    for (const info of Object.values(shards) as unknown[]) {
+      if (!info || typeof info !== "object" || !("path" in info) || typeof info.path !== "string") throw new Error("Invalid dictionary shard path.");
+      const compression = "compression" in info ? info.compression : undefined;
+      if (compression !== undefined && compression !== "gzip") throw new Error("Unsupported dictionary shard compression.");
+      const suffix = compression === "gzip" ? "\\.json\\.gz" : "\\.json";
+      if (!new RegExp(`^by-${direction}/u[0-9a-f]+(?:-[0-9a-f]+)*${suffix}$`).test(info.path)) {
+        throw new Error(`Dictionary shard path/compression mismatch: ${info.path}`);
+      }
+      if (compression === "gzip") {
+        for (const key of ["compressedBytes", "uncompressedBytes"] as const) {
+          const bytes = (info as Record<string, unknown>)[key];
+          if (typeof bytes !== "number" || !Number.isSafeInteger(bytes) || bytes < 0) {
+            throw new Error(`Invalid gzip shard ${key}: ${info.path}`);
+          }
+        }
+      }
+    }
   }
 }
 
@@ -55,6 +90,7 @@ export async function enumerateBrowserDictionaryUploadFiles(rootDirectory: strin
   const firstDirectory = join(root, "by-first");
   const lastDirectory = join(root, "by-last");
   try {
+    if ((await lstat(root)).isSymbolicLink() || (await lstat(manifestPath)).isSymbolicLink() || (await lstat(firstDirectory)).isSymbolicLink() || (await lstat(lastDirectory)).isSymbolicLink()) throw new Error();
     if (!(await stat(manifestPath)).isFile() || !(await stat(firstDirectory)).isDirectory() || !(await stat(lastDirectory)).isDirectory()) throw new Error();
   } catch {
     throw new Error("Browser dictionary not found. Run npm run dictionary:browser first.");
@@ -64,6 +100,19 @@ export async function enumerateBrowserDictionaryUploadFiles(rootDirectory: strin
   catch { throw new Error("Browser dictionary manifest is invalid."); }
   validateManifest(manifest);
   const files = await collectFiles(root);
+  const byPath = new Map(files.map((file) => [relative(root, file).split(sep).join("/"), file]));
+  const expected = new Set(["manifest.json"]);
+  for (const info of [...Object.values(manifest.firstCharShards), ...Object.values(manifest.lastCharShards)]) {
+    const path = byPath.get(info.path);
+    if (!path) throw new Error(`Referenced dictionary shard is missing: ${info.path}`);
+    if (info.compression === "gzip" && (await stat(path)).size !== info.compressedBytes) {
+      throw new Error(`Dictionary compressed size mismatch: ${info.path}`);
+    }
+    expected.add(info.path);
+  }
+  for (const path of byPath.keys()) {
+    if (!expected.has(path)) throw new Error(`Unreferenced dictionary file: ${path}. Regenerate with dictionary:browser before uploading.`);
+  }
   const described = await Promise.all(files.map(async (absolutePath) => {
     const relativePath = relative(root, absolutePath);
     return { absolutePath, relativePath, pathname: toBlobPathname(prefix, relativePath), bytes: (await stat(absolutePath)).size, isManifest: relativePath.split(sep).join("/") === "manifest.json" };

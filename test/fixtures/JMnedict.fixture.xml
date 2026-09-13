@@ -19,4 +19,5 @@
   <entry><ent_seq>2009</ent_seq><k_ele><keb>ABC123</keb></k_ele><r_ele><reb>えーびーしー</reb></r_ele><trans><name_type>&product;</name_type></trans></entry>
   <entry><ent_seq>2010</ent_seq><k_ele><keb>日本ABC</keb></k_ele><r_ele><reb>にほんえーびーしー</reb></r_ele><trans><name_type>&organization;</name_type></trans></entry>
   <entry><ent_seq>2011</ent_seq><k_ele><keb>不正読名</keb></k_ele><r_ele><reb>ABC123</reb></r_ele><trans><name_type>&unclass;</name_type></trans></entry>
+  <entry><ent_seq>2012</ent_seq><k_ele><keb>京都</keb></k_ele><r_ele><reb>きょうと</reb></r_ele><trans><name_type>&place;</name_type></trans><trans><name_type>&surname;</name_type></trans></entry>
 </JMnedict>

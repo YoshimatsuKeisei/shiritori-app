@@ -30,6 +30,7 @@ export function createWordEntry(raw: RawWordEntry): WordEntry {
     partOfSpeech: [...(raw.partOfSpeech ?? [])],
     semanticTags: [...(raw.semanticTags ?? [])],
     ...(raw.properNounType === undefined ? {} : { properNounType: raw.properNounType }),
+    ...(raw.properNounTypes === undefined ? {} : { properNounTypes: [...raw.properNounTypes] }),
     scriptType: classifyScriptType(normalizedSurface),
     characterCount: Array.from(normalizedReading).length,
     ...edges,

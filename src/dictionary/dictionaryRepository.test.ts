@@ -2,12 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { resolveWordEntry } from "./createWordEntry.js";
-import { buildDictionary, deduplicateWordEntries } from "./import/buildDictionary.js";
+import { createWordEntry, resolveWordEntry } from "./createWordEntry.js";
+import { buildDictionary, calculateDictionaryStatistics, deduplicateWordEntries, wordEntryDeduplicationKey } from "./import/buildDictionary.js";
 import { parseJmdictEntry } from "./import/jmdict.js";
-import { mapJmnedictNameType, parseJmnedictEntry } from "./import/jmnedict.js";
+import { mapJmnedictNameType, mapJmnedictNameTypes, parseJmnedictEntry } from "./import/jmnedict.js";
 import { InMemoryDictionaryRepository } from "./repository.js";
-import type { DictionaryScope } from "./types.js";
+import type { DictionaryScope, ProperNounType } from "./types.js";
 import { evaluateAnswer } from "../rules/evaluate.js";
 
 const fixtures = fileURLToPath(new URL("../../test/fixtures/", import.meta.url));
@@ -149,6 +149,79 @@ test("stores deterministic source metadata", () => {
   assert.equal(generated.metadata.jmnedictSource, "JMnedict.fixture.xml");
   assert.equal(generated.metadata.statistics?.totalEntries, generated.entries.length);
   assert.equal((generated.metadata.statistics?.bySource.JMdict ?? 0) > 0, true);
-  assert.equal(generated.metadata.statistics?.bySource.JMnedict, 9);
-  assert.deepEqual(generated.metadata.statistics?.jmnedict, { PERSON: 2, PLACE: 2, ORGANIZATION: 2, WORK: 1, PRODUCT: 1, OTHER: 1 });
+  assert.equal(generated.metadata.statistics?.bySource.JMnedict, 10);
+  assert.deepEqual(generated.metadata.statistics?.jmnedict, { PERSON: 3, PLACE: 3, ORGANIZATION: 2, WORK: 1, PRODUCT: 1, OTHER: 1 });
+});
+
+test("maps all name tags to distinct categories in fixed order", () => {
+  const cases: [readonly string[], ProperNounType[]][] = [
+    ...["surname", "given", "fem", "masc", "person", "unclass"].map((tag): [string[], ProperNounType[]] => [[tag], ["PERSON"]]),
+    [["place"], ["PLACE"]], [["station"], ["PLACE"]],
+    [["organization"], ["ORGANIZATION"]], [["company"], ["ORGANIZATION"]],
+    [["work"], ["WORK"]], [["product"], ["PRODUCT"]],
+    [["unknown"], ["OTHER"]], [[], ["OTHER"]],
+    [["place", "surname"], ["PERSON", "PLACE"]],
+    [["surname", "given", "person"], ["PERSON"]],
+    [["place", "unknown"], ["PLACE"]],
+    [["product", "work", "company", "place", "surname"], ["PERSON", "PLACE", "ORGANIZATION", "WORK", "PRODUCT"]],
+  ];
+  for (const [tags, expected] of cases) {
+    assert.deepEqual(mapJmnedictNameTypes(tags), expected);
+    assert.deepEqual(mapJmnedictNameTypes([...tags].reverse()), expected);
+    assert.equal(mapJmnedictNameType(tags), expected[0]);
+  }
+});
+
+test("imports multiple trans name types without losing tags or changing usage keys", () => {
+  const entry = repository.findByReading("きょうと")[0]!;
+  assert.deepEqual(entry.properNounTypes, ["PERSON", "PLACE"]);
+  assert.equal(entry.properNounType, "PERSON");
+  assert.deepEqual(entry.semanticTags, ["place", "surname"]);
+  assert.equal(entry.source, "JMnedict");
+  assert.equal(resolveWordEntry(entry, "きょうと").usageKey, "きょうと");
+  assert.equal(resolveWordEntry(entry, "きょうと", "kanji").usageKey, "京都");
+  assert.equal(repository.findByReading("りす")[0]?.properNounTypes, undefined);
+  const categories: ProperNounType[] = ["PERSON", "PLACE"];
+  const copy = createWordEntry({ id: "copy", source: "JMnedict", reading: "きょうと", surface: "京都", properNounTypes: categories });
+  categories.pop();
+  assert.deepEqual(copy.properNounTypes, ["PERSON", "PLACE"]);
+});
+
+test("includes a multi-category entry when ANY category is enabled", () => {
+  for (const [people, places, count] of [[true, false, 1], [false, true, 1], [false, false, 0]] as const) {
+    assert.equal(repository.findByReading("きょうと", { ...allScope, people, places }).length, count);
+    assert.equal(repository.findByReading("きょうと", { ...allScope, people, places, properNouns: false }).length, 0);
+  }
+});
+
+test("supports legacy JSON and lets explicit categories override the legacy primary", () => {
+  const legacy = createWordEntry({ id: "legacy", source: "JMnedict", reading: "とうきょう", surface: "東京", properNounType: "PLACE" });
+  const oldRepository = new InMemoryDictionaryRepository([legacy]);
+  assert.equal(oldRepository.findByReading("とうきょう", { ...allScope, people: false }).length, 1);
+  assert.equal(oldRepository.findByReading("とうきょう", { ...allScope, places: false }).length, 0);
+  const explicitRepository = new InMemoryDictionaryRepository([{ ...legacy, properNounTypes: ["PERSON"] }]);
+  assert.equal(explicitRepository.findByReading("とうきょう", { ...allScope, people: false }).length, 0);
+  const emptyRepository = new InMemoryDictionaryRepository([{ ...legacy, properNounTypes: [] }]);
+  assert.equal(emptyRepository.findByReading("とうきょう", { ...allScope, places: false }).length, 0);
+  assert.deepEqual(repository.findByReading("じしょのもり")[0]?.properNounTypes, ["OTHER"]);
+});
+
+test("deduplicates category sets independently of their order without merging different sets", () => {
+  const entry = repository.findByReading("きょうと")[0]!;
+  const reordered = { ...entry, properNounTypes: ["PLACE", "PERSON", "PLACE"] as ProperNounType[] };
+  assert.equal(wordEntryDeduplicationKey(entry), wordEntryDeduplicationKey(reordered));
+  assert.equal(deduplicateWordEntries([entry, reordered]).length, 1);
+  assert.notEqual(wordEntryDeduplicationKey(entry), wordEntryDeduplicationKey({ ...entry, properNounTypes: ["PERSON"] }));
+  assert.deepEqual(reordered.properNounTypes, ["PLACE", "PERSON", "PLACE"]);
+});
+
+test("counts category memberships once per category and preserves unique entry totals", () => {
+  const entry = repository.findByReading("きょうと")[0]!;
+  const legacy = createWordEntry({ id: "legacy-stat", source: "JMnedict", reading: "とうきょう", surface: "東京", properNounType: "PLACE" });
+  const statistics = calculateDictionaryStatistics([{ ...entry, properNounTypes: ["PLACE", "PERSON", "PLACE"] }, legacy]);
+  assert.equal(statistics.totalEntries, 2);
+  assert.equal(statistics.bySource.JMnedict, 2);
+  assert.equal(statistics.jmnedict.PERSON, 1);
+  assert.equal(statistics.jmnedict.PLACE, 2);
+  assert.equal(Object.values(statistics.jmnedict).reduce((sum, count) => sum + count, 0), 3);
 });

@@ -20,7 +20,9 @@ export interface WordEntry {
   normalizedSurface: string;
   partOfSpeech: string[];
   semanticTags: string[];
+  /** Legacy primary category; use properNounTypes for scope filtering. */
   properNounType?: ProperNounType;
+  properNounTypes?: ProperNounType[];
   scriptType: ScriptType;
   characterCount: number;
   firstChar: string;
@@ -51,7 +53,7 @@ export interface ResolvedWord {
 }
 
 export type RawWordEntry = Pick<WordEntry, "id" | "source" | "reading" | "surface"> &
-  Partial<Pick<WordEntry, "partOfSpeech" | "semanticTags" | "properNounType">>;
+  Partial<Pick<WordEntry, "partOfSpeech" | "semanticTags" | "properNounType" | "properNounTypes">>;
 
 export type UsageKeyMode = "normal" | "kanji";
 
@@ -67,6 +69,7 @@ export interface DictionaryStatistics {
   totalEntries: number;
   bySource: Record<DictionarySource, number>;
   jmdict: { commonNouns: number; proverbs: number };
+  /** Category memberships since Stage 8.4.1; their sum may exceed JMnedict entries. */
   jmnedict: Record<ProperNounType, number>;
 }
 

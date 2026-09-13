@@ -6,13 +6,20 @@ import { extractBlocks, extractEntityCode, extractTagValues } from "./xmlEntries
 const PERSON_TYPES = new Set(["surname", "given", "fem", "masc", "person", "unclass"]);
 const PLACE_TYPES = new Set(["place", "station"]);
 
+/** Fixed category order also defines the backwards-compatible primary category. */
+export function mapJmnedictNameTypes(tags: readonly string[]): ProperNounType[] {
+  const categories: ProperNounType[] = [];
+  if (tags.some((tag) => PERSON_TYPES.has(tag))) categories.push("PERSON");
+  if (tags.some((tag) => PLACE_TYPES.has(tag))) categories.push("PLACE");
+  if (tags.includes("organization") || tags.includes("company")) categories.push("ORGANIZATION");
+  if (tags.includes("work")) categories.push("WORK");
+  if (tags.includes("product")) categories.push("PRODUCT");
+  return categories.length > 0 ? categories : ["OTHER"];
+}
+
+/** Legacy primary-category API. */
 export function mapJmnedictNameType(tags: readonly string[]): ProperNounType {
-  if (tags.some((tag) => PERSON_TYPES.has(tag))) return "PERSON";
-  if (tags.some((tag) => PLACE_TYPES.has(tag))) return "PLACE";
-  if (tags.includes("organization") || tags.includes("company")) return "ORGANIZATION";
-  if (tags.includes("work")) return "WORK";
-  if (tags.includes("product")) return "PRODUCT";
-  return "OTHER";
+  return mapJmnedictNameTypes(tags)[0]!;
 }
 
 export function parseJmnedictEntry(xml: string): WordEntry[] {
@@ -20,7 +27,8 @@ export function parseJmnedictEntry(xml: string): WordEntry[] {
   if (!sequence) return [];
   const surfaces = extractBlocks(xml, "k_ele").flatMap((block) => extractTagValues(block, "keb"));
   const nameTypes = extractTagValues(xml, "name_type").map(extractEntityCode);
-  const properNounType = mapJmnedictNameType(nameTypes);
+  const properNounTypes = mapJmnedictNameTypes(nameTypes);
+  const properNounType = properNounTypes[0]!;
   const entries: WordEntry[] = [];
 
   for (const [readingIndex, block] of extractBlocks(xml, "r_ele").entries()) {
@@ -40,6 +48,7 @@ export function parseJmnedictEntry(xml: string): WordEntry[] {
         partOfSpeech: [],
         semanticTags: nameTypes,
         properNounType,
+        properNounTypes,
       }));
     }
   }

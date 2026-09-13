@@ -40,6 +40,8 @@ interface Player {
 
 辞書DB上のレコード。
 
+Stage 8.4.1以降、JMnedictの`properNounTypes`は複数の所属カテゴリを保持する。scopeは有効カテゴリが1つでもあれば採用する。`properNounType`は固定順の先頭を示すlegacy分類であり、配列がない旧JSON（または空配列）のfallbackに使用する。optional追加のためschemaVersion=1を維持する。
+
 ```ts
 interface WordEntry {
   id: string;
@@ -56,6 +58,7 @@ interface WordEntry {
   semanticTags: string[];
 
   properNounType?: ProperNounType;
+  properNounTypes?: ProperNounType[];
 
   scriptType:
     | "kanji"
@@ -97,7 +100,7 @@ interface DictionaryMetadata {
     totalEntries: number;
     bySource: Record<"JMdict" | "JMnedict", number>;
     jmdict: { commonNouns: number; proverbs: number };
-    jmnedict: Record<ProperNounType, number>;
+    jmnedict: Record<ProperNounType, number>; // Category memberships (Stage 8.4.1+)
   };
 }
 
@@ -463,11 +466,22 @@ interface ResultSummary {
 ## 16. BrowserDictionaryManifest
 
 ```ts
-interface BrowserDictionaryShardInfo {
+interface LegacyBrowserDictionaryShardInfo {
   path: string;
   entries: number;
   bytes: number;
+  compression?: undefined;
 }
+
+interface GzipBrowserDictionaryShardInfo {
+  path: string; // by-first/u304b.json.gz 等
+  entries: number;
+  compression: "gzip";
+  compressedBytes: number;
+  uncompressedBytes: number;
+}
+
+type BrowserDictionaryShardInfo = LegacyBrowserDictionaryShardInfo | GzipBrowserDictionaryShardInfo;
 
 interface BrowserDictionaryManifest {
   schemaVersion: number;
@@ -481,6 +495,8 @@ interface BrowserDictionaryManifest {
 ```
 
 各shardの実体は`WordEntry[]`。manifestに存在しない文字は、manifest取得後に限りロード済み0件と確定できる。manifestまたは対象shardの取得前は0件として扱わない。
+
+Stage 8.4.2のbrowser manifestはschemaVersion=2、shardはgzip圧縮。`compression`がない旧manifestは非圧縮JSONとして読める。圧縮前後のbytesはUTF-8 JSONとgzipファイルの実測値。生成元DictionaryMetadataのschemaVersion=1およびWordEntryの内容は変更しない。
 
 ---
 

@@ -1,4 +1,5 @@
 import { normalizeReading } from "./japaneseText.js";
+import { getProperNounTypes } from "./properNounTypes.js";
 import type {
   DictionaryQuery,
   DictionaryRepository,
@@ -22,14 +23,16 @@ function isProverb(entry: WordEntry): boolean {
 export function isEntryInScope(entry: WordEntry, scope: DictionaryScope): boolean {
   if (entry.source === "JMdict") return isProverb(entry) ? scope.proverbs : scope.commonNouns;
   if (!scope.properNouns) return false;
-  switch (entry.properNounType) {
-    case "PERSON": return scope.people;
-    case "PLACE": return scope.places;
-    case "ORGANIZATION": return scope.organizations;
-    case "WORK": return scope.works;
-    case "PRODUCT": return scope.products;
-    default: return true;
-  }
+  return getProperNounTypes(entry).some((category) => {
+    switch (category) {
+      case "PERSON": return scope.people;
+      case "PLACE": return scope.places;
+      case "ORGANIZATION": return scope.organizations;
+      case "WORK": return scope.works;
+      case "PRODUCT": return scope.products;
+      case "OTHER": return true;
+    }
+  });
 }
 
 export class InMemoryDictionaryRepository implements DictionaryRepository {

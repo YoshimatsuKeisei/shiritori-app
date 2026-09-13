@@ -65,6 +65,7 @@ WordEntry {
   partOfSpeech: string[]
   semanticTags: string[]
   properNounType?: ProperNounType
+  properNounTypes?: ProperNounType[]
   scriptType: "kanji" | "katakana" | "hiragana" | "mixed"
   characterCount: number
   firstChar: string
@@ -402,7 +403,9 @@ npm run dictionary:build -- --jmdict data/raw/JMdict.xml.gz --jmnedict data/raw/
 - organization/company → `ORGANIZATION`
 - work → `WORK`
 - product → `PRODUCT`
-- 未対応・不明 → `OTHER`
+- 既知カテゴリが1つもないentry → `OTHER`
+
+`mapJmnedictNameTypes`は全tagを評価し、重複のないカテゴリ集合をPERSON → PLACE → ORGANIZATION → WORK → PRODUCT → OTHERの固定順で返す。例えば`place + surname`は`["PERSON", "PLACE"]`。既知＋未知tagの場合はOTHERを追加しない。`properNounTypes`に全分類を、legacy `properNounType`に配列先頭を保存し、元tagは`semanticTags`へ保持する。
 
 ## 18. 検索Repository
 
@@ -420,9 +423,11 @@ npm run dictionary:build -- --jmdict data/raw/JMdict.xml.gz --jmnedict data/raw/
 
 JMdictの通常採用語は`commonNouns`、ことわざタグ付き語は`proverbs`で制御する。JMnedictは`properNouns`をマスター設定とし、PERSON/PLACE/ORGANIZATION/WORK/PRODUCTを個別設定で制御する。`OTHER`は`properNouns`有効時に許可する。
 
+JMnedictの1entryは複数カテゴリに属する。`properNounTypes`のいずれか1つが有効なら採用（ANY enabled category matches）する。`properNouns=false`なら常に除外。配列がない旧JSONまたは空配列は`properNounType`の1要素配列へfallbackし、両方なければOTHERとする。このfallbackは`getProperNounTypes`で共通化する。
+
 ## 20. 重複除去
 
-完全重複キーは、source、normalizedReading、normalizedSurface、properNounType、ソート済みpartOfSpeech、ソート済みsemanticTagsの組とする。同じ読みでも表記が異なる「橋・箸・端」は削除しない。JMdict/JMnedict間も出典・分類が異なるため自動統合しない。
+完全重複キーは、source、normalizedReading、normalizedSurface、properNounType、重複排除・ソート済みproperNounTypes、ソート済みpartOfSpeech、ソート済みsemanticTagsの組とする。同じ読みでも表記が異なる「橋・箸・端」は削除しない。JMdict/JMnedict間も出典・分類が異なるため自動統合しない。
 
 ## 21. 出典とライセンス
 
@@ -430,11 +435,19 @@ JMdictの通常採用語は`commonNouns`、ことわざタグ付き語は`prover
 
 ## 22. ブラウザ向け辞書
 
-ブラウザでは約111MBの`data/generated/dictionary.json`を直接importまたは全件fetchしない。`npm run dictionary:browser`で次の再生成可能な静的アセットへ分割する。
+ブラウザでは巨大な`data/generated/dictionary.json`を直接importまたは全件fetchしない。`npm run dictionary:browser`で次の再生成可能な静的アセットへ分割する。
 
-- `manifest.json`: schema、生成日時、原典ファイル名、原典metadata、総entry数、各shardのpath・件数・bytes
+- `manifest.json`: schema、生成日時、原典ファイル名、原典metadata、総entry数、各shardのpath・件数・`compression: "gzip"`・`compressedBytes`・`uncompressedBytes`
 - `by-first/`: `normalizedReading.firstChar`別。通常、2文字、文字数増加、禁止文字、入力読み検索に使用
 - `by-last/`: `normalizedReading.lastChar`別。リバースの候補検索に使用
+
+Stage 8.4.2のbrowser manifestはschemaVersion=2。各shardは`.json.gz`のみ保存し、manifestは非圧縮とする。Node専用`nodeBuildBrowserDictionary.ts`がgzip level 6でshardごとにserialize → gzip → writeを逐次実行する。Nodeのzlibをbrowser barrelへexportしない。生成前は既知の生成物のみを削除し、追跡ファイル・未知ファイル・symlinkを検出した場合は削除前に停止する。旧`.json`と古い`.gz`の残留を防ぎ、manifestは全shard成功後に書き込む。
+
+Loaderは`compression === "gzip"`ならraw bytesを`arrayBuffer()`で取得し、Web標準`DecompressionStream("gzip")`で明示的に展開後、UTF-8テキストをJSON.parseする。HTTP Content-Encodingによる自動展開には依存しない。compressionがないschemaVersion=1のmanifestは従来どおり`response.json()`で読む。未対応browserは明確なエラーとし、追加の圧縮ライブラリは導入しない。
+
+`compressedBytes`はgzip実ファイルサイズ、`uncompressedBytes`は展開後UTF-8 JSONサイズ。CLI統計は方向別合計・平均・両サイズでの最大shard（4種類）を出力する。`totalCompressedBytes`と`totalUncompressedBytes`は両方に非圧縮manifestのbytesを含み、平均・方向別合計はshardのみ。`compressionRatio`は圧縮後合計/展開後合計、`spaceSavedPercentage`は削減率%。0除算を防止し、空の最大shardはnullとする。
+
+gzipは保存・通信量を削減するが、展開後JSONサイズやparse後のobject数を減らさない。約49MBの最大展開サイズへの対処が十分かどうかは、圧縮後の実測と実機のロード時間・メモリ負荷を確認してから判断する。今回shardキー再設計やDB化は行わない。
 
 ファイル名はUnicodeコードポイントによる決定的なASCII名とする。`BrowserDictionaryLoader`はmanifestと必要shardだけをfetchし、同一セッションではPromise cacheにより重複取得しない。状態は`UNLOADED`、`LOADING`、`LOADED`を区別し、未ロード範囲を候補0件と解釈してはならない。
 
@@ -452,14 +465,20 @@ Stage 8.2では`deriveNextConnection`が返す正規サイズの接続かなを�
 
 再生成可能な`public/dictionary/`はGit管理外を維持する。`dictionary:blob:upload -- --prefix <version>`は配下だけを再帰列挙し、Windows pathをBlob用`/`へ変換する。最大4並列でshardを先にuploadし、全成功後にmanifestを最後に公開する。pathnameはversion prefixと相対pathの決定的な組で、random suffix・overwriteを許可しない。
 
+Stage 8.4.2ではmanifestは`application/json`、gzip shardは`application/gzip`。HTTP Content-Encodingは設定しない。upload前に全参照ファイルと圧縮bytesを確認し、参照外ファイル・拡張子取り違えがあれば停止する。multipartはgzip実ファイルサイズが4,000,000 bytes以上なら有効。完了時のuploaded bytesはmanifestを含む実際の保存ファイル合計。
+
 upload用`BLOB_READ_WRITE_TOKEN`はNode CLIだけが`process.env`から読み、ブラウザコードや`VITE_`変数へ渡さない。upload後はmanifestのSDK返却URLからBase URLを導出するため、Blob hostをコードへ固定しない。
 
 ## 24. Stage 8.4 JMnedict本番統合とcoverage監査
 
-本番生成はJMdictとJMnedictの両パスを`dictionary:build`へ渡す。JMdictの採用範囲は`n`, `n-adv`, `n-pr`, `n-pref`, `n-suf`, `n-t`, `num`, `pn`と`proverb`のまま維持する。JMnedictはPERSON、PLACE、ORGANIZATION、WORK、PRODUCT、OTHERへ分類し、未知の`name_type`はbuildを停止せずOTHERとする。日本語として正規化できない読み・表記は`createWordEntry`前に除外するが、日本語を含む混在表記は保持する。
+本番生成はJMdictとJMnedictの両パスを`dictionary:build`へ渡す。JMdictの採用範囲は`n`, `n-adv`, `n-pr`, `n-pref`, `n-suf`, `n-t`, `num`, `pn`と`proverb`のまま維持する。JMnedictはPERSON、PLACE、ORGANIZATION、WORK、PRODUCT、OTHERへ分類し、未知の`name_type`でもbuildを停止しない。Stage 8.4.1以降は既知カテゴリがないentryだけOTHERとする。日本語として正規化できない読み・表記は`createWordEntry`前に除外するが、日本語を含む混在表記は保持する。
 
 `DictionaryMetadata.statistics`は後方互換のためoptionalとし、総数、source別、JMdictの一般名詞/ことわざ、JMnedictの分類別件数を保持する。ブラウザmanifestはmetadataをそのまま保持し、shard内の`source`と`properNounType`も削除しない。
 
 `dictionary:audit`は生成JSON全体をscopeで絞らず監査し、正規化読みごとにsource、reading、surface、properNounType、partOfSpeech、semanticTagsを表示する。通常プレイのscopeは全項目有効とし、JMdict/JMnedictを同じRepositoryで検索する。有名度、姓・名の形式、地名規模による追加フィルタは行わない。重複キーはsourceを含む従来仕様を維持し、通常モードの使用済みキーは読み、漢字モードは表記とする。
 
 辞書更新は既存Blob版を上書きせず`dictionaries/full-v1`のような新規prefixへ公開し、Vercel環境変数を切り替える。旧版は実機確認が終わるまでrollback用に保持する。
+
+Stage 8.4.1ではoptionalの`properNounTypes`追加によりschemaVersion=1を維持する。shard JSONにも配列をそのまま保持し、ロード後のRepositoryで同じscope判定を使用する。auditはlegacy分類と配列の両方を表示する。配列がない旧JSONでは`properNounTypes: -`を表示し、再生成が必要なことを判別できる。
+
+新規生成の`statistics.jmnedict`はCategory memberships（カテゴリ所属件数）。1entryが複数分類に属する場合、それぞれへ1件ずつ加算するため、分類件数合計は`bySource.JMnedict`を超え得る。総entry数は従来どおり重複排除後のレコード数とする。旧metadataのprimary分類件数は読み込み時に変更せず、再生成後に所属件数へ更新する。

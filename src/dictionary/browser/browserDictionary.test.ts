@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { createWordEntry } from "../createWordEntry.js";
-import type { GeneratedDictionary, WordEntry } from "../types.js";
+import type { DictionaryScope, GeneratedDictionary, WordEntry } from "../types.js";
 import { createBrowserDictionaryManifest, groupEntriesBy } from "./buildBrowserDictionary.js";
 import { BrowserDictionaryLoader, type DictionaryFetch } from "./loader.js";
 import { BrowserDictionarySession } from "./session.js";
@@ -46,6 +46,30 @@ test("keeps JMnedict source and proper noun type in browser shards", () => {
   const shardEntry = groups.get("と")?.find((entry) => entry.id === "name-1");
   assert.equal(shardEntry?.source, "JMnedict");
   assert.equal(shardEntry?.properNounType, "PLACE");
+});
+
+test("loads serialized multi-category shards and applies ANY-category scope on either index", async () => {
+  const entry = createWordEntry({ id: "multi-shard", source: "JMnedict", reading: "とうきょう", surface: "東京", properNounType: "PERSON", properNounTypes: ["PERSON", "PLACE"], semanticTags: ["place", "surname"] });
+  const combined: GeneratedDictionary = { ...dictionary, entries: [...entries, entry] };
+  const firstGroups = groupEntriesBy(combined.entries, (word) => word.firstChar);
+  const lastGroups = groupEntriesBy(combined.entries, (word) => word.lastChar);
+  const combinedManifest = createBrowserDictionaryManifest(combined, firstGroups, lastGroups, "fixture.json");
+  const assets = new Map<string, string>([["/dictionary/manifest.json", JSON.stringify(combinedManifest)]]);
+  for (const [character, group] of firstGroups) assets.set(`/dictionary/${combinedManifest.firstCharShards[character]!.path}`, JSON.stringify(group));
+  for (const [character, group] of lastGroups) assets.set(`/dictionary/${combinedManifest.lastCharShards[character]!.path}`, JSON.stringify(group));
+  const fetcher: DictionaryFetch = async (url) => ({ ok: assets.has(url), json: async (): Promise<unknown> => JSON.parse(assets.get(url)!) });
+  const scope: DictionaryScope = { commonNouns: true, proverbs: true, properNouns: true, people: false, places: true, organizations: false, works: false, products: false };
+  for (const direction of ["first", "last"] as const) {
+    const loader = new BrowserDictionaryLoader("/dictionary", fetcher);
+    if (direction === "first") await loader.ensureFirstChar("と");
+    else await loader.ensureLastChar("う");
+    const loaded = loader.repository.findByReading("とうきょう", scope);
+    assert.deepEqual(loaded[0]?.properNounTypes, ["PERSON", "PLACE"]);
+    assert.equal(loaded[0]?.source, "JMnedict");
+    assert.equal(loader.repository.findByReading("とうきょう", { ...scope, people: true, places: false }).length, 1);
+    assert.equal(loader.repository.findByReading("とうきょう", { ...scope, places: false }).length, 0);
+    assert.equal(loader.repository.findByReading("とうきょう", { ...scope, properNouns: false }).length, 0);
+  }
 });
 
 test("loads みらい from the み first-character shard", async () => {

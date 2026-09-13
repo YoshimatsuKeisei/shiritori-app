@@ -41,6 +41,14 @@ npm.cmd run dictionary:audit -- --dictionary data/generated/dictionary.json --re
 
 `NOT FOUND`はPOSを即座に拡張する根拠ではない。原典収録状況、POS、表記・読みvalidationを切り分けてから採用基準を見直す。
 
+### Stage 8.4.1 複数の固有名詞カテゴリ
+
+JMnedictの1entryは複数の論理カテゴリに属することができる。例えば`place, surname`は`properNounTypes: ["PERSON", "PLACE"]`となる。配列は重複を除き、PERSON → PLACE → ORGANIZATION → WORK → PRODUCT → OTHERの固定順で生成する。既知カテゴリがない場合だけOTHERとし、既知＋未知tagでは既知カテゴリのみ保持する。元tagは`semanticTags`に残る。
+
+scope判定は「有効なカテゴリが1つでも一致すれば採用（ANY enabled category matches）」。人名OFF・地名ONでもPERSON＋PLACEの語を利用できる。ただし`properNouns=false`は全固有名詞を除外する。legacyの`properNounType`は固定順の先頭として残し、新配列がない旧JSON（または空配列）はlegacy分類、両方なければOTHERへfallbackする。旧JSONから失われた複数分類を復元するには原典から再生成が必要。
+
+`dictionary:audit`は`properNounType`と`properNounTypes`を両方表示する。旧JSONで配列がない場合は`properNounTypes: -`と表示する。`dictionary:build`の`Category memberships`およびmetadataの`statistics.jmnedict`は所属件数であり、PERSON＋PLACEの1entryを両方へ1件ずつ数える。分類件数の合計はJMnedict総entry数を超え得る。Stage 8.4の旧metadataの分類統計はprimary件数のままで、再build後に所属件数へ更新される。
+
 ## 1人デバッグGameState
 
 `createDebugGame`、`submitAnswer`、`selectKanjiCandidate`、`cancelKanjiSelection`で、UIなしの1人しりとり状態遷移を実行できる。辞書fixtureを使った連続回答、漢字・カタカナ確定、候補0件、時間記録の実行例は`src/game/debugGame.test.ts`を参照する。
@@ -63,9 +71,9 @@ npm run dictionary:browser
 npm run dev
 ```
 
-既に`public/dictionary/manifest.json`とshardが存在すれば、以後は`npm run dev`だけで起動できる。通常起動は本番JMdict shardを利用し、約111MBの単一JSONをJavaScript bundleへ含めず、必要な先頭・末尾文字shardだけを遅延fetchする。fixtureを明示利用する場合はURLへ`?dictionary=fixture`を付け、その場合だけ`DEBUG DICTIONARY`を表示する。
+既に`public/dictionary/manifest.json`とshardが存在すれば、以後は`npm run dev`だけで起動できる。通常起動は本番JMdict/JMnedict shardを利用し、生成元の巨大JSONをJavaScript bundleへ含めず、必要な先頭・末尾文字shardだけを遅延fetchする。fixtureを明示利用する場合はURLへ`?dictionary=fixture`を付け、その場合だけ`DEBUG DICTIONARY`を表示する。
 
-`public/dictionary/`は約222MBの再生成可能な派生物であるためGit管理外とする。生成script、manifestの型、出典情報、再生成手順はGit管理する。JMdict/JMnedictの出典と再配布条件は`NOTICE.md`を参照する。
+`public/dictionary/`は再生成可能な派生物であるためGit管理外とする。JMdict/JMnedict統合後の非圧縮shardは実測約946MB（2方向合計）。Stage 8.4.2ではgzip配信へ変更し、圧縮後容量を生成時に計測する。生成script、manifestの型、出典情報、再生成手順はGit管理する。出典と再配布条件は`NOTICE.md`を参照する。
 
 主な確認コマンド：
 
@@ -135,7 +143,32 @@ TWO_CHARACTERの`かいしゃ → しゃ`、REVERSE、文字数、小書き文�
 
 ## GitHub → Vercel + Vercel Blob deployment
 
-アプリ本体はGitHubからVercelへbuildし、約222MBのブラウザ辞書はPublic Vercel Blob Storeへversion別に配置する。`public/dictionary/`、`web-dist/`、`dist/`はGit管理しない。
+アプリ本体はGitHubからVercelへbuildし、ブラウザ辞書の`manifest.json`と`*.json.gz`はPublic Vercel Blob Storeへversion別に配置する。`public/dictionary/`、`web-dist/`、`dist/`はGit管理しない。
+
+### Stage 8.4.2 gzip生成と容量確認
+
+`dictionary:browser`はNode標準`node:zlib`のgzip level 6で1 shardずつ圧縮し、`manifest.json`（非圧縮）と`by-first/*.json.gz`・`by-last/*.json.gz`のみを生成する。生成開始時、出力ディレクトリ内の既知の生成物を事前検査して除去する。Git追跡ファイル、生成物以外のファイル、symlinkを含む出力先は拒否する。既定出力は`public/dictionary`で、`--out`も専用の生成物ディレクトリを指定する。削除した生成物は生成元JSONから再生成できる。原典と`data/generated/dictionary.json`には触れない。
+
+新しいbrowser manifestはschemaVersion=2。各shardに`compression: "gzip"`、`compressedBytes`（ファイル/転送bytes）、`uncompressedBytes`（展開後UTF-8 JSON bytes）を保持する。WordEntry側のschemaVersionは1のまま。Loaderはcompressionなしの旧manifestを従来のJSONとして読み込むため、既存Blob辞書も利用できる。
+
+gzip shard is stored as an explicit compressed artifact. BrowserDictionaryLoader explicitly decompresses it. It does not depend on HTTP Content-Encoding. `.gz`は`application/gzip`、manifestは`application/json`で保存し、HTTPの`Content-Encoding: gzip`には依存しない。ブラウザでは`arrayBuffer()` → `DecompressionStream("gzip")` → UTF-8テキスト → `JSON.parse()`の順に読む。Web標準APIを利用し、Nodeのzlibや追加の圧縮ライブラリはブラウザへ組み込まない。
+
+対象はCompression Streams API対応ブラウザ。[MDNの互換性情報](https://developer.mozilla.org/en-US/docs/Web/API/DecompressionStream)で対応を確認できる。未対応なら`This browser does not support gzip dictionary decompression.`をthrowする。HTTP取得、gzip展開、JSON parseの失敗はそれぞれ区別し、失敗したshardは次回再試行可能。展開中も同じPromiseを共有する。
+
+生成完了時の主な統計：
+
+- `totalEntries`, `totalFiles`, `manifestBytes`
+- `totalCompressedBytes`, `totalUncompressedBytes`：両方に非圧縮manifestを含む。旧`totalBytes`は廃止
+- `compressionRatio`：`totalCompressedBytes / totalUncompressedBytes`（0〜1付近の比率。0.184なら18.4%）
+- `spaceSavedPercentage`：`(1 - compressionRatio) * 100`。空入力の0除算を防止
+- `firstCompressedBytes`, `firstUncompressedBytes`, `lastCompressedBytes`, `lastUncompressedBytes`：方向別shard合計、manifestを除く
+- `averageCompressedShardBytes`, `averageUncompressedShardBytes`：shardのみの平均
+- `largestCompressedFirstShard`, `largestCompressedLastShard`：転送bytes最大
+- `largestUncompressedFirstShard`, `largestUncompressedLastShard`：展開後JSON bytes最大
+
+最大shardの各項目はpath、文字、件数と両方のbytesを含む。gzipで保存容量・転送量は減るが、約49MB級の展開後JSONや`JSON.parse`後のobjectメモリは減らない。今回shard方式は変更せず、圧縮後実測とスマホの操作・ロード時間を見て、次段階で細分化が必要か判断する。
+
+Stage 8.4.1後の生成元JSONが最新なら`dictionary:build`の再実行は不要。まず`npm.cmd run dictionary:browser`だけを実行し、上記の容量・4種類の最大shard統計を共有して判断してからuploadする。圧縮後の実測を確認するまで本番Blobへ投入しない。
 
 ### 1. Public Blob Storeを準備
 
@@ -149,13 +182,15 @@ $env:BLOB_READ_WRITE_TOKEN="<token>"
 
 ### 3. 辞書をversion prefixへupload
 
-ブラウザ辞書が未生成なら、先に`npm.cmd run dictionary:browser`を実行する。
+ブラウザ辞書が未生成なら、先に`npm.cmd run dictionary:browser`を実行する。Stage 8.4.2では圧縮統計を確認し、容量・最大転送shardが妥当と判断できた後だけ次へ進む。
 
 ```powershell
-npm.cmd run dictionary:blob:upload -- --prefix shiritori-dictionary-v1
+npm.cmd run dictionary:blob:upload -- --prefix dictionaries/full-v1
 ```
 
 CLIは`public/dictionary/`内のshardを最大4並列でuploadし、manifestを最後にuploadする。同一pathnameのoverwriteとrandom suffixは無効。途中失敗したprefixは再利用せず、別のversion prefixを使用する。
+
+upload前にmanifest参照先の存在、圧縮形式と拡張子、圧縮bytesを検査する。参照されない旧`.json`等が混在していればupload前に停止する。multipartの閾値4,000,000 bytesは実際にuploadするファイルサイズで判定する。
 
 完了時に表示される`Dictionary base URL`をコピーする。
 
@@ -164,7 +199,7 @@ CLIは`public/dictionary/`内のshardを最大4並列でuploadし、manifestを�
 Vercel Projectへ次を設定する。
 
 ```text
-VITE_DICTIONARY_BASE_URL=https://<upload結果のpublic-host>/shiritori-dictionary-v1
+VITE_DICTIONARY_BASE_URL=https://<upload結果のpublic-host>/dictionaries/full-v1
 ```
 
 host名を例から推測せず、CLIが返したURLを使用する。末尾slashの有無はどちらでもよい。未設定のローカル開発では従来どおり`/dictionary`を使用する。
@@ -192,16 +227,19 @@ git push
 
 ### 辞書更新時
 
-原典を更新した場合だけ、辞書生成、browser shard生成、新しいversion prefixへのuploadを行う。
+原典または辞書生成ロジックを更新した場合に、辞書生成、browser shard生成、新しいversion prefixへのuploadを行う。Stage 8.4.1では以下の順に実行し、auditで東京・大阪などの`properNounTypes: PERSON, PLACE`を確認してからbrowser生成とuploadへ進む。
 
 ```powershell
 npm.cmd run dictionary:build -- --jmdict data/raw/JMdict_e.gz --jmnedict data/raw/JMnedict.xml.gz
-npm.cmd run dictionary:audit -- --reading とうきょう --reading おおさか --reading やまだ
+npm.cmd run dictionary:audit -- --reading とうきょう --reading おおさか --reading やまだ --reading たなか
 npm.cmd run dictionary:browser
+# 圧縮統計を共有・確認してから次を実行
 npm.cmd run dictionary:blob:upload -- --prefix dictionaries/full-v1
 ```
 
-CLIが出力した`dictionaries/full-v1`のBase URLへVercelの`VITE_DICTIONARY_BASE_URL`を変更して再deployする。既存`dictionaries/jmdict-v1`へ上書きせず、正常動作を確認するまで旧版を削除せずrollback可能な状態を維持する。`dictionary:browser`は総entry数・ファイル数・bytesと先頭/末尾それぞれの最大shardを出力する。
+CLIが出力した`dictionaries/full-v1`のBase URLへVercelの`VITE_DICTIONARY_BASE_URL`を変更して再deployする。既存`dictionaries/jmdict-v1`へ上書きせず、正常動作を確認するまで旧版を削除せずrollback可能な状態を維持する。Redeploy後は通常回答、固有名詞、タイマー、shardロード時間、スマホ操作を実機確認する。
+
+`dictionaries/full-v1`を既に使用済みの場合は、上書きせず未使用のversion prefixを指定する。Redeploy後は実機で通常回答と漢字候補選択を確認する。
 
 ### Security
 

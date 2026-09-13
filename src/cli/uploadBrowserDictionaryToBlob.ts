@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 
 import { put } from "@vercel/blob";
 
-import { normalizeBlobPrefix, uploadBrowserDictionary } from "./browserDictionaryBlobUpload.js";
+import { dictionaryBlobPutOptions, normalizeBlobPrefix, uploadBrowserDictionary } from "./browserDictionaryBlobUpload.js";
 
 function parsePrefix(values: readonly string[]): string {
   const index = values.indexOf("--prefix");
@@ -17,14 +17,11 @@ async function main(): Promise<void> {
   try {
     const result = await uploadBrowserDictionary({
       rootDirectory: resolve("public/dictionary"), prefix, token: process.env.BLOB_READ_WRITE_TOKEN,
-      upload: async (file, token) => put(file.pathname, await readFile(file.absolutePath), {
-        access: "public", token, contentType: "application/json", addRandomSuffix: false,
-        allowOverwrite: false, multipart: file.bytes >= 4_000_000,
-      }),
+      upload: async (file, token) => put(file.pathname, await readFile(file.absolutePath), dictionaryBlobPutOptions(file, token)),
       log: console.log,
     });
     console.log(`Uploaded: ${result.files} files`);
-    console.log(`Total bytes: ${result.totalBytes}`);
+    console.log(`Uploaded bytes (stored files, including compressed shards): ${result.totalBytes}`);
     console.log(`Dictionary base URL:\n${result.baseUrl}`);
   } catch (error: unknown) {
     console.error(error instanceof Error ? error.message : String(error));
