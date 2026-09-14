@@ -451,7 +451,17 @@ gzipは保存・通信量を削減するが、展開後JSONサイズやparse後�
 
 ファイル名はUnicodeコードポイントによる決定的なASCII名とする。`BrowserDictionaryLoader`はmanifestと必要shardだけをfetchし、同一セッションではPromise cacheにより重複取得しない。状態は`UNLOADED`、`LOADING`、`LOADED`を区別し、未ロード範囲を候補0件と解釈してはならない。
 
-React側の`BrowserDictionarySession`が必要範囲を非同期に保証した後、ロード済みentryで構築した既存`InMemoryDictionaryRepository`を同期GameStateへ渡す。出典情報は原典metadataをmanifestへ保持し、`NOTICE.md`の条件を引き継ぐ。
+React側の`BrowserDictionarySession`が必要範囲を非同期に保証した後、ロード済みentryを保持する同一`InMemoryDictionaryRepository`を同期GameStateへ渡す。出典情報は原典metadataをmanifestへ保持し、`NOTICE.md`の条件を引き継ぐ。
+
+Stage 8.4.3ではLoader生成時に空のRepositoryを一度だけ生成し、shard fetch → body read → gzip decode/JSON parse → `addEntries(entries)`の順で追加する。Repository object identityを維持し、全ロード済みentry/indexの再構築とLoader側の全entry Mapを廃止する。RepositoryはIDのSetで既存登録とbatch内の重複を除き、新規entryだけを読み・先頭1文字・先頭2文字・末尾1文字・文字数・文字種indexへ追加する。配列はloopでpushし、entry objectをcloneしない。
+
+`addEntries`は`{ added, skippedDuplicates }`、readonly getterの`size`は登録件数を返す。既存constructorも同じ追加処理を利用する。同一IDの初出entryを保持し、後続の重複で内容を上書きしない。候補順は初出ロード順・shard内順で、追加sortingなし。異なるsourceの異なるIDは従来どおり残し、全query・DictionaryScope・properNounTypesのANY判定を維持する。登録済みentryは呼び出し側で変更しない。
+
+新規batchの全entryをindex更新前に検証し、不正データ時は追加を開始しない。commit部分ではawait・validation・外部callbackを行わない。HTTP・body read・gzip・JSON parse・index検証の失敗はshardの失敗Promiseをcacheから除き、後からretryできる。同時shard要求はfetchからindex追加まで1つのPromiseを共有する。既存GameStateの辞書load中pause/resumeとSessionの次接続候補確認用先読みは変更しない。
+
+optional runtime APIの`DictionaryTimingOptions`（Loader constructor第4引数）は`onTiming`と`now`を受け取る。`DictionaryTimingEvent`のphaseはmanifest、shard-fetch、shard-body-read、gzip-decode-and-parse、repository-index、shard-total。完了順にdurationMs・success/error・方向/文字・件数・manifestのbytesを通知し、index/total成功時は追加/重複件数も通知する。totalはmanifest待ちを除く。旧JSONではbody-readにJSON parseを含める。cache hitは計測せず、callback未指定なら時計を呼ばない。時計はperformance.now（fallback Date.now）、testではfake clockを注入する。callback例外でloadを失敗させない。
+
+`?dictionaryMetrics=1`を明示した場合だけReactの本番辞書LoaderがConsoleへ計測を出し、通常画面には表示しない。timingはruntime情報のみでmanifest/辞書schemaは変更しない。既存gzip full-v1の再生成・再uploadとVercel環境変数の変更は不要。shard分割・永続cache・先読み戦略の変更や実辞書の耐久試験はこのStageに含めない。
 
 Stage 8.1以降、Sessionは回答読みの先頭shardを取得後、実際の候補を`ResolvedWord`化し、ルールエンジンの`deriveNextConnection`から次shardを決定する。TWO_CHARACTERでは次条件2文字の先頭、通常系の長音終端では直前かな、REVERSEでは先頭文字に対応する末尾shardを取得する。
 

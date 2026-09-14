@@ -9,6 +9,25 @@ import type {
 
 type Index = Map<string, WordEntry[]>;
 
+export interface AddEntriesResult {
+  added: number;
+  skippedDuplicates: number;
+}
+
+const INDEX_STRING_FIELDS = ["normalizedReading", "firstChar", "firstTwoChars", "lastChar", "scriptType"] as const;
+
+/** Validate a batch before mutating indexes. Entries are plain, immutable dictionary records. */
+function validateIndexableEntry(entry: WordEntry): void {
+  if (INDEX_STRING_FIELDS.some((key) => typeof entry[key] !== "string") ||
+      !Number.isSafeInteger(entry.characterCount) || entry.characterCount < 0 ||
+      !Array.isArray(entry.kanjiChars) || !entry.kanjiChars.every((value) => typeof value === "string") ||
+      !Array.isArray(entry.semanticTags) || !entry.semanticTags.every((value) => typeof value === "string") ||
+      (entry.source !== "JMdict" && entry.source !== "JMnedict") ||
+      (entry.properNounTypes !== undefined && (!Array.isArray(entry.properNounTypes) || !entry.properNounTypes.every((value) => typeof value === "string")))) {
+    throw new Error(`Invalid dictionary entry for indexing: ${entry.id}`);
+  }
+}
+
 function add(index: Index, key: string | number, entry: WordEntry): void {
   const normalizedKey = String(key);
   const bucket = index.get(normalizedKey);
@@ -36,7 +55,8 @@ export function isEntryInScope(entry: WordEntry, scope: DictionaryScope): boolea
 }
 
 export class InMemoryDictionaryRepository implements DictionaryRepository {
-  readonly #entries: readonly WordEntry[];
+  readonly #entries: WordEntry[] = [];
+  readonly #entryIds = new Set<string>();
   readonly #reading: Index = new Map();
   readonly #firstChar: Index = new Map();
   readonly #firstTwoChars: Index = new Map();
@@ -45,15 +65,40 @@ export class InMemoryDictionaryRepository implements DictionaryRepository {
   readonly #scriptType: Index = new Map();
 
   constructor(entries: readonly WordEntry[]) {
-    this.#entries = [...entries];
+    this.addEntries(entries);
+  }
+
+  get size(): number {
+    return this.#entries.length;
+  }
+
+  /** First occurrence of an ID wins. Existing records and index buckets are never rebuilt. */
+  addEntries(entries: readonly WordEntry[]): AddEntriesResult {
+    const pending: WordEntry[] = [];
+    const pendingIds = new Set<string>();
+    let skippedDuplicates = 0;
     for (const entry of entries) {
+      if (!entry || typeof entry.id !== "string" || !entry.id) throw new Error("Invalid dictionary entry ID for indexing.");
+      if (this.#entryIds.has(entry.id) || pendingIds.has(entry.id)) {
+        skippedDuplicates += 1;
+        continue;
+      }
+      validateIndexableEntry(entry);
+      pending.push(entry);
+      pendingIds.add(entry.id);
+    }
+    // No await, user callbacks, or validation during commit; all indexes share entry references.
+    for (const entry of pending) {
       add(this.#reading, entry.normalizedReading, entry);
       add(this.#firstChar, entry.firstChar, entry);
       add(this.#firstTwoChars, entry.firstTwoChars, entry);
       add(this.#lastChar, entry.lastChar, entry);
       add(this.#characterCount, entry.characterCount, entry);
       add(this.#scriptType, entry.scriptType, entry);
+      this.#entries.push(entry);
+      this.#entryIds.add(entry.id);
     }
+    return { added: pending.length, skippedDuplicates };
   }
 
   findByReading(reading: string, scope?: DictionaryScope): readonly WordEntry[] {

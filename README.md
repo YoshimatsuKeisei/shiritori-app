@@ -170,6 +170,29 @@ gzip shard is stored as an explicit compressed artifact. BrowserDictionaryLoader
 
 Stage 8.4.1後の生成元JSONが最新なら`dictionary:build`の再実行は不要。まず`npm.cmd run dictionary:browser`だけを実行し、上記の容量・4種類の最大shard統計を共有して判断してからuploadする。圧縮後の実測を確認するまで本番Blobへ投入しない。
 
+### Stage 8.4.3 Browser dictionary performance
+
+`BrowserDictionaryLoader`は空の`InMemoryDictionaryRepository`を1回だけ作り、新shardを`addEntries(entries)`でincremental indexingする。ロード済み全entryからのRepository/index再構築は行わない。戻り値は`{ added, skippedDuplicates }`、`repository.size`は重複を除いた登録件数。同一IDは先に登録されたentryを保持し、first/last shard間の重複を二重登録しない。候補順は初出のロード順・shard内順を維持し、sortingしない。
+
+登録前に新規entry全件を検証し、不正データがあればそのbatchを一切追加しない。登録後のentryは変更せず扱う。Loader側の全entry Mapは廃止し、Repositoryは元のobjectへの参照を配列と各indexへloopで追加する。Promise cache・同時load共有・失敗後retryは維持。GameState/RuleEngine、辞書ロード中の時計停止、次接続の候補0件確認に必要な先読みは変更していない。
+
+実機のブラウザURLへ`?dictionaryMetrics=1`（既存queryがあれば`&dictionaryMetrics=1`）を付けると、開発者Consoleへ`[dictionary]`の計測eventを出す。1vs1と1人debug画面の本番辞書で利用できる。通常プレイでは出力せず、画面への数値表示もない。キャッシュ再利用時は新しいeventを出さない。
+
+| phase | 計測範囲 |
+| --- | --- |
+| `manifest` | manifestのfetch・body/JSON parse・検証 |
+| `shard-fetch` | fetch開始からレスポンス（headers）取得まで |
+| `shard-body-read` | gzipの`arrayBuffer()`。旧JSONでは`response.json()`のparseも含む |
+| `gzip-decode-and-parse` | gzip展開・UTF-8 decode・JSON parse |
+| `repository-index` | 新batchの検証・ID重複判定・新規entryだけのindex追加 |
+| `shard-total` | manifest待ちを除くshard処理開始からRepository追加完了まで |
+
+eventは完了順に通知する。`durationMs`、`status: success/error`、shard方向と文字、entry件数、manifest由来の圧縮/展開bytesを含む。index/total成功eventには`addedEntries`・`duplicateEntries`も含む。bytesは宣言されたファイルサイズであり、HTTP cacheを考慮した実転送量ではない。totalはphase間の処理と計測callbackの時間も含むため、個別durationの単純合計と一致するとは限らない。
+
+プログラムからは既存constructorの第4引数で`{ onTiming(event), now() }`を任意指定できる。時計の既定は`performance.now()`（なければ`Date.now()`）。callback未指定なら時計を呼ばず、callback例外は辞書loadへ伝播させない。timing型はruntime APIのみで、manifest schemaVersion=2やWordEntry schemaは変更しない。
+
+このStageはコード更新だけ。既存`dictionaries/full-v1`をそのまま利用でき、辞書の再生成・Blob再upload・`VITE_DICTIONARY_BASE_URL`変更は不要。deploy後、最初の回答とキャッシュ再利用時の待ち時間、およびshardが増えたときの`repository-index`・decode/parse・totalを実機で比較する。fixtureテストでは時間の速さを比較せず、増分追加・同一instanceとfake clockの計測を検証する。実辞書での速度改善幅は未計測。
+
 ### 1. Public Blob Storeを準備
 
 Vercel側でPublic Blob Storeを作成または利用可能にし、read/write tokenを取得する。Dashboardの画面名称は変更されることがあるため、現在のVercel Blob案内に従う。
